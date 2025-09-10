@@ -121,9 +121,12 @@ export const serializeSrt = (entries: SrtEntryData[]): string => {
     .map((entry, i) => {
       // Re-index on serialization to ensure correctness
       const index = i + 1;
+      // Normalize timestamps to ensure correct format on output.
+      const startTime = normalizeTimestamp(entry.startTime);
+      const endTime = normalizeTimestamp(entry.endTime);
       // Ensure all line breaks are CRLF for better compatibility.
       const textWithCrlf = entry.text.replace(/\r?\n/g, '\r\n');
-      return `${index}\r\n${entry.startTime} --> ${entry.endTime}\r\n${textWithCrlf}`;
+      return `${index}\r\n${startTime} --> ${endTime}\r\n${textWithCrlf}`;
     })
     .join('\r\n\r\n');
 };

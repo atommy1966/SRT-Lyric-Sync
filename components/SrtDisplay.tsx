@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowPathIcon, CopyIcon, DownloadIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon } from './icons';
 import { serializeSrt, SrtEntryData, msToTimestamp, timestampToMs } from '../utils/srtUtils';
 import SrtEntry from './SrtEntry';
 import Loader from './Loader';
+import ContextMenu from './ContextMenu';
 
 interface SrtDisplayProps {
   entries: SrtEntryData[];
@@ -16,6 +17,14 @@ interface SrtDisplayProps {
   isRefining: boolean;
   offset: number;
   setOffset: (offset: number) => void;
+}
+
+interface ContextMenuState {
+    x: number;
+    y: number;
+    entry: SrtEntryData;
+    isFirst: boolean;
+    isLast: boolean;
 }
 
 const SrtDisplay: React.FC<SrtDisplayProps> = ({ 
@@ -32,13 +41,16 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
     setOffset
 }) => {
   const [copied, setCopied] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const handleOffsetChange = (newOffsetValue: number) => {
     const diff = newOffsetValue - offset;
     if (diff === 0) return;
 
-    // Apply the difference to each entry's timestamps
-    const newEntries = entries.map(entry => {
+    setEntries(currentEntries => currentEntries.map(entry => {
         const newStartTime = timestampToMs(entry.startTime) + diff;
         const newEndTime = timestampToMs(entry.endTime) + diff;
         return {
@@ -46,12 +58,9 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
             startTime: msToTimestamp(newStartTime),
             endTime: msToTimestamp(newEndTime),
         };
-    });
-
-    setEntries(newEntries);
+    }));
     setOffset(newOffsetValue);
   };
-
 
   const getCurrentSrtContent = () => {
     return serializeSrt(entries);
@@ -64,8 +73,6 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
 
   const handleDownload = () => {
     const content = getCurrentSrtContent();
-    // Add a BOM (Byte Order Mark) to the beginning of the file to improve compatibility
-    // with various text editors and video players, especially on Windows.
     const bom = '\uFEFF';
     const blob = new Blob([bom + content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -90,14 +97,14 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
     });
   };
   
-  const handleDelete = (index: number) => {
+  const handleDelete = useCallback((index: number) => {
     setEntries(currentEntries => 
         currentEntries.filter(e => e.index !== index)
                       .map((e, i) => ({ ...e, index: i + 1 }))
     );
-  };
+  }, [setEntries]);
 
-  const handleMove = (originalIndex: number, direction: 'up' | 'down') => {
+  const handleMove = useCallback((originalIndex: number, direction: 'up' | 'down') => {
       setEntries(currentEntries => {
         const arrayIndex = currentEntries.findIndex(e => e.index === originalIndex);
         if (arrayIndex === -1) return currentEntries;
@@ -107,12 +114,11 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
     
         if (targetIndex >= 0 && targetIndex < newEntries.length) {
             [newEntries[arrayIndex], newEntries[targetIndex]] = [newEntries[targetIndex], newEntries[arrayIndex]];
-            // Re-assign indices to maintain order
             return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
         }
         return currentEntries;
       });
-  };
+  }, [setEntries]);
 
   const handleAdd = () => {
     setEntries(currentEntries => {
@@ -128,7 +134,7 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
     });
   };
 
-  const handleInsert = (afterIndex: number) => {
+  const handleInsert = useCallback((afterIndex: number) => {
     setEntries(currentEntries => {
         const insertAtIndex = currentEntries.findIndex(e => e.index === afterIndex);
         if (insertAtIndex === -1) return currentEntries;
@@ -136,7 +142,7 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
         const previousEntry = currentEntries[insertAtIndex];
 
         const newEntry: SrtEntryData = {
-            index: 0, // will be re-indexed
+            index: 0, 
             startTime: previousEntry.endTime,
             endTime: previousEntry.endTime,
             text: 'New subtitle'
@@ -147,9 +153,9 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
         
         return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
     });
-  };
+  }, [setEntries]);
 
-  const handleMerge = (indexToMerge: number) => {
+  const handleMerge = useCallback((indexToMerge: number) => {
     setEntries(currentEntries => {
         const mergeArrayIndex = currentEntries.findIndex(e => e.index === indexToMerge);
         
@@ -172,8 +178,7 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
         
         return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
     });
-  };
-
+  }, [setEntries]);
 
   useEffect(() => {
     if (copied) {
@@ -181,15 +186,64 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
       return () => clearTimeout(timer);
     }
   }, [copied]);
+  
+  const handleContextMenu = (e: React.MouseEvent, entry: SrtEntryData, isFirst: boolean, isLast: boolean) => {
+      e.preventDefault();
+      setContextMenu({ x: e.clientX, y: e.clientY, entry, isFirst, isLast });
+  };
+  const closeContextMenu = () => setContextMenu(null);
+
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+      e.preventDefault();
+      if (draggedIndex === null || draggedIndex === index) return;
+      setDragOverIndex(index);
+  };
+  
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+      e.preventDefault();
+      if (draggedIndex === null) return;
+
+      setEntries(currentEntries => {
+          const newEntries = [...currentEntries];
+          const [draggedItem] = newEntries.splice(draggedIndex, 1);
+          newEntries.splice(dropIndex, 0, draggedItem);
+          return newEntries.map((entry, i) => ({...entry, index: i + 1}));
+      });
+  };
+  
+  const handleDragEnd = () => {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+  };
 
   const allControlsDisabled = isRefining;
 
   return (
-    <div className="bg-gray-800 rounded-lg h-full flex flex-col relative">
+    <div className="bg-gray-800 rounded-lg h-full flex flex-col relative" onClick={contextMenu ? closeContextMenu : undefined}>
       {isRefining && (
-          <div className="absolute inset-0 z-20 rounded-lg">
+          <div className="absolute inset-0 z-30 rounded-lg">
               <Loader message="Refining timings..." />
           </div>
+      )}
+      {contextMenu && (
+          <ContextMenu 
+              x={contextMenu.x}
+              y={contextMenu.y}
+              entry={contextMenu.entry}
+              isFirst={contextMenu.isFirst}
+              isLast={contextMenu.isLast}
+              onClose={closeContextMenu}
+              onDelete={handleDelete}
+              onInsert={handleInsert}
+              onMerge={handleMerge}
+              onMove={handleMove}
+          />
       )}
       <div className={`p-3 bg-gray-900/50 rounded-t-lg border-b border-gray-700 sticky top-0 z-10 transition-all ${allControlsDisabled ? 'filter blur-sm' : ''}`}>
         <div className="flex justify-between items-center">
@@ -253,14 +307,19 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
             {entries.map((entry, idx) => (
                 <SrtEntry 
                     key={entry.index} 
-                    entry={entry} 
-                    onUpdate={handleUpdate}
-                    onDelete={handleDelete}
-                    onMove={handleMove}
-                    onInsert={handleInsert}
-                    onMerge={handleMerge}
+                    entry={entry}
                     isFirst={idx === 0}
                     isLast={idx === entries.length - 1}
+                    onUpdate={handleUpdate}
+                    onContextMenu={(e) => handleContextMenu(e, entry, idx === 0, idx === entries.length - 1)}
+                    // Drag & Drop props
+                    index={idx}
+                    isDragging={draggedIndex === idx}
+                    isDragOver={dragOverIndex === idx}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    onDragEnd={handleDragEnd}
                 />
             ))}
         </div>
