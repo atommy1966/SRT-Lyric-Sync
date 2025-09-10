@@ -1,0 +1,5 @@
+{
+  "name": "SRT Lyric Sync",
+  "description": "Upload a video with audio and provide the full lyrics to automatically generate a synchronized SRT subtitle file using AI.",
+  "requestFramePermissions": []
+}
