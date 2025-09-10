@@ -8,6 +8,7 @@ interface VideoPreviewProps {
 }
 
 const VideoPreview: React.FC<VideoPreviewProps> = ({ videoFile, videoUrl, entries }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [vttUrl, setVttUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,23 +27,24 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ videoFile, videoUrl, entrie
     };
   }, [entries]);
 
+  useEffect(() => {
+    // When the vttUrl changes, we need to manually tell the video element
+    // to load the new track. The `key` prop trick can be unreliable in some browsers.
+    if (vttUrl && videoRef.current) {
+        videoRef.current.load();
+    }
+  }, [vttUrl]);
+
   return (
     <div className="w-full h-full flex items-center justify-center p-2">
-      {/* 
-        Only render the video element if we have a vttUrl.
-        The `key={vttUrl}` is the critical part of this fix. 
-        It tells React to treat the video as a completely new element whenever the subtitles change.
-        This forces the browser to load the new <track> from scratch, which is the most reliable
-        way to ensure subtitles are displayed correctly.
-      */}
-      {vttUrl && (
-        <video
-          key={vttUrl}
-          controls
-          crossOrigin="anonymous"
-          className="w-full h-full max-h-full object-contain rounded-lg"
-        >
-          <source src={videoUrl} type={videoFile.type} />
+      <video
+        ref={videoRef}
+        controls
+        crossOrigin="anonymous"
+        className="w-full h-full max-h-full object-contain rounded-lg"
+      >
+        <source src={videoUrl} type={videoFile.type} />
+        {vttUrl && (
           <track
             label="Lyrics"
             kind="subtitles"
@@ -50,9 +52,9 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ videoFile, videoUrl, entrie
             src={vttUrl}
             default
           />
-          Your browser does not support the video tag.
-        </video>
-      )}
+        )}
+        Your browser does not support the video tag.
+      </video>
     </div>
   );
 };

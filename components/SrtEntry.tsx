@@ -1,17 +1,19 @@
 import React from 'react';
 import { SrtEntryData } from '../utils/srtUtils';
-import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from './icons';
+import { ArrowDownIcon, ArrowUpIcon, ChevronDoubleDownIcon, PlusIcon, TrashIcon } from './icons';
 
 interface SrtEntryProps {
   entry: SrtEntryData;
   onUpdate: (index: number, field: keyof SrtEntryData, value: string | number) => void;
   onDelete: (index: number) => void;
   onMove: (index: number, direction: 'up' | 'down') => void;
+  onInsert: (index: number) => void;
+  onMerge: (index: number) => void;
   isFirst: boolean;
   isLast: boolean;
 }
 
-const SrtEntry: React.FC<SrtEntryProps> = ({ entry, onUpdate, onDelete, onMove, isFirst, isLast }) => {
+const SrtEntry: React.FC<SrtEntryProps> = ({ entry, onUpdate, onDelete, onMove, onInsert, onMerge, isFirst, isLast }) => {
 
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'startTime' | 'endTime') => {
     onUpdate(entry.index, field, e.target.value);
@@ -67,9 +69,30 @@ const SrtEntry: React.FC<SrtEntryProps> = ({ entry, onUpdate, onDelete, onMove, 
             >
                 <ArrowDownIcon className="w-4 h-4" />
             </button>
-             <button 
+            
+            <div className="border-t border-gray-700 w-4/5 my-1"></div>
+
+            <button
+                onClick={() => onInsert(entry.index)}
+                className="p-1.5 rounded-md hover:bg-gray-700"
+                title="Insert line below"
+            >
+                <PlusIcon className="w-4 h-4" />
+            </button>
+            <button
+                onClick={() => onMerge(entry.index)}
+                disabled={isLast}
+                className="p-1.5 rounded-md hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Merge with next"
+            >
+                <ChevronDoubleDownIcon className="w-4 h-4" />
+            </button>
+            
+            <div className="border-t border-gray-700 w-4/5 my-1"></div>
+            
+            <button 
               onClick={() => onDelete(entry.index)}
-              className="p-1.5 rounded-md hover:bg-red-800/50 text-red-400 mt-4"
+              className="p-1.5 rounded-md hover:bg-red-800/50 text-red-400"
               title="Delete"
             >
                 <TrashIcon className="w-4 h-4" />

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { SrtEntryData } from "../utils/srtUtils";
+import { SrtEntryData, normalizeTimestamp } from "../utils/srtUtils";
 
 const API_KEY = process.env.API_KEY;
 
@@ -35,73 +35,33 @@ const extractJson = (text: string): string => {
     return text.trim();
 };
 
-
-export const generateSrtFromVideoAndLyrics = async (
-  videoBase64: string,
-  mimeType: string,
-  lyrics: string
-): Promise<SrtEntryData[]> => {
-  try {
-    const videoPart = {
-      inlineData: {
-        data: videoBase64,
-        mimeType: mimeType,
-      },
-    };
-
-    const prompt = `
-You are an expert in creating subtitle files. I have provided a video and the full lyrics for the audio in that video.
-Your task is to analyze the audio in the video and create a synchronized list of subtitle entries for the provided lyrics.
-
-**Instructions:**
-1. Listen carefully to the audio in the video.
-2. Match each line of the provided lyrics to the corresponding speech or singing in the audio.
-3. Generate timestamps in the **strict** standard SRT format: \`HH:MM:SS,ms\` (Hours:Minutes:Seconds,Milliseconds).
-   - **Crucially**, use a comma (,) as the separator before milliseconds.
-   - For example, a timestamp for 14 seconds and 249 milliseconds must be formatted as \`00:00:14,249\`. A timestamp for 1 minute, 23 seconds, and 456 milliseconds must be \`00:01:23,456\`.
-4. The output must be ONLY a JSON array of objects, without any markdown formatting, extra text, or explanations. Each object represents a subtitle entry and must contain 'index', 'startTime', 'endTime', and 'text' fields.
-5. The 'index' should start from 1.
-
-**Lyrics:**
----
-${lyrics}
----
-`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: { parts: [videoPart, { text: prompt }] },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              index: {
-                type: Type.INTEGER,
-                description: 'The sequential index of the subtitle, starting from 1.',
-              },
-              startTime: {
-                type: Type.STRING,
-                description: 'The start timestamp in HH:MM:SS,ms format.',
-              },
-              endTime: {
-                type: Type.STRING,
-                description: 'The end timestamp in HH:MM:SS,ms format.',
-              },
-              text: {
-                type: Type.STRING,
-                description: 'The subtitle text for this entry.',
-              },
-            },
-            required: ["index", "startTime", "endTime", "text"],
-          },
+const srtDataSchema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        index: {
+          type: Type.INTEGER,
+          description: 'The sequential index of the subtitle, starting from 1.',
+        },
+        startTime: {
+          type: Type.STRING,
+          description: 'The start timestamp in HH:MM:SS,ms format.',
+        },
+        endTime: {
+          type: Type.STRING,
+          description: 'The end timestamp in HH:MM:SS,ms format.',
+        },
+        text: {
+          type: Type.STRING,
+          description: 'The subtitle text for this entry.',
         },
       },
-    });
-    
-    const rawText = response.text;
+      required: ["index", "startTime", "endTime", "text"],
+    },
+};
+
+const processAiResponse = (rawText: string): SrtEntryData[] => {
     if (!rawText) {
         throw new Error("The AI returned an empty response.");
     }
@@ -127,11 +87,66 @@ ${lyrics}
        if (result.length === 0) {
         throw new Error("The AI returned an empty list of subtitles.");
       }
-      return result as SrtEntryData[];
+      
+      // Normalize timestamps to the strict HH:MM:SS,mmm format.
+      const normalizedResult = result.map(item => ({
+            ...item,
+            startTime: normalizeTimestamp(item.startTime),
+            endTime: normalizeTimestamp(item.endTime),
+      }));
+
+      return normalizedResult as SrtEntryData[];
     } else {
       console.error("AI response did not match expected schema:", result);
       throw new Error("The AI response was not in the expected format.");
     }
+}
+
+
+export const generateSrtFromVideoAndLyrics = async (
+  videoBase64: string,
+  mimeType: string,
+  lyrics: string
+): Promise<SrtEntryData[]> => {
+  try {
+    const videoPart = {
+      inlineData: {
+        data: videoBase64,
+        mimeType: mimeType,
+      },
+    };
+
+    const prompt = `
+You are a subtitle generation expert. Your task is to synchronize the provided lyrics with the audio from the video.
+Return a JSON array where each object represents a subtitle line.
+
+**JSON Object Structure:**
+- \`index\`: Sequential number, starting at 1.
+- \`startTime\`: Start timestamp in \`HH:MM:SS,ms\` format (e.g., \`00:01:23,456\`). **Crucially, use a comma (,) before the milliseconds.**
+- \`endTime\`: End timestamp in \`HH:MM:SS,ms\` format (e.g., \`00:01:25,789\`). **Crucially, use a comma (,) before the milliseconds.**
+- \`text\`: The line of lyric text.
+
+**Important Rules:**
+1.  Analyze the video's audio to find the precise start and end times for each line of the provided lyrics.
+2.  Make a best-effort guess for timings if a perfect match is not possible. Do not leave any lyric line out.
+3.  The final output must be ONLY the JSON array. Do not include any other text or markdown.
+
+**Lyrics to synchronize:**
+---
+${lyrics}
+---
+`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: [videoPart, { text: prompt }] },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: srtDataSchema,
+      },
+    });
+    
+    return processAiResponse(response.text);
 
   } catch (error) {
     console.error("Error generating SRT content:", error);
@@ -141,4 +156,65 @@ ${lyrics}
     }
     throw new Error("An unknown error occurred while generating subtitles.");
   }
+};
+
+export const refineSrtTimings = async (
+    videoBase64: string,
+    mimeType: string,
+    currentEntries: SrtEntryData[]
+): Promise<SrtEntryData[]> => {
+    try {
+        const videoPart = {
+            inlineData: {
+              data: videoBase64,
+              mimeType: mimeType,
+            },
+        };
+
+        const prompt = `
+You are an expert subtitle timing refinement tool.
+Your task is to analyze the audio from the provided video and adjust the timings for an existing set of subtitles to be as precise as possible.
+
+**Input:** You will receive a JSON array of subtitle entries.
+**Output:** You must return the full, updated list of subtitles in the exact same JSON array format.
+
+**IMPORTANT Rules:**
+1.  Adjust the \`startTime\` and \`endTime\` for each entry to perfectly match the audio.
+2.  DO NOT change the \`text\`, \`index\`, or the order of the entries.
+3.  Ensure timestamps are in \`HH:MM:SS,ms\` format. **Crucially, use a comma (,) before the milliseconds.**
+4.  Your entire response must be ONLY the JSON array. Do not add any extra text, explanations, or markdown formatting.
+
+**Subtitles to refine:**
+---
+${JSON.stringify(currentEntries, null, 2)}
+---
+`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [videoPart, { text: prompt }] },
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: srtDataSchema,
+            },
+        });
+
+        const refinedEntries = processAiResponse(response.text);
+
+        // As a final safety check, ensure the refined entries match the original text and order
+        if (refinedEntries.length !== currentEntries.length || 
+            refinedEntries.some((entry, i) => entry.text !== currentEntries[i].text)) {
+            console.error("Refinement process failed: AI altered the subtitle text or count.", { original: currentEntries, refined: refinedEntries });
+            throw new Error("The AI failed to follow instructions and altered the subtitle text. Please try again.");
+        }
+
+        return refinedEntries;
+
+    } catch (error) {
+        console.error("Error refining SRT timings:", error);
+        if (error instanceof Error) {
+            throw new Error(`Failed to refine timings. Details: ${error.message}`);
+        }
+        throw new Error("An unknown error occurred while refining timings.");
+    }
 };
