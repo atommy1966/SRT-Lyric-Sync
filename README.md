@@ -4,6 +4,8 @@
 
 # Run and deploy your AI Studio app
 
+We have released an app that automatically generates synchronized subtitle data (SRT) from audio-enabled videos and lyric text.
+
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/drive/1kWFibHCBKNuJguPk493Wi9W3-AG9HKgV
