@@ -7,36 +7,34 @@ export interface SrtEntryData {
 
 /**
  * Normalizes a timestamp string to the strict HH:MM:SS,mmm format.
- * Handles variations like MM:SS,mmm or SS,mmm and fixes incorrect separators.
+ * Handles variations with ',', '.', or ':' as millisecond separators.
  * @param timestamp The raw timestamp string from any source.
  * @returns A strictly formatted timestamp string.
  */
 export const normalizeTimestamp = (timestamp: string): string => {
-    // Handle null/undefined or empty strings gracefully
     if (!timestamp || typeof timestamp !== 'string') {
         return '00:00:00,000';
     }
 
-    // 1. Ensure comma separator for milliseconds
-    let correctedTimestamp = timestamp.trim().replace(/[.:](\d{3})$/, ',$1');
-
-    // 2. Split into time and milliseconds
-    const parts = correctedTimestamp.split(',');
-    let timePart = parts[0];
-    let msPart = parts.length > 1 ? parts[1] : '000';
-
-    // Handle cases where there are no milliseconds (e.g., "00:00:12")
-    if (parts.length === 1 && timePart.match(/^((\d{1,2}:)?\d{1,2}:)?\d{1,2}$/)) {
-        msPart = '000';
-    } else if (parts.length !== 2) {
-        console.warn(`Unexpected timestamp format: "${timestamp}". Defaulting to 00:00:00,000.`);
-        return '00:00:00,000';
-    }
+    const trimmedTimestamp = timestamp.trim();
+    // Use regex to find the time part and an optional ms part with various separators.
+    // This regex captures (everything before separator), (the separator), and (the milliseconds).
+    const msMatch = trimmedTimestamp.match(/(.*)([.,:])(\d{1,3})$/);
     
-    // 3. Split time into H, M, S
-    const timeSegments = timePart.split(':');
+    let timePart: string;
+    let msPart = '000';
 
-    // 4. Pad time segments to HH:MM:SS
+    if (msMatch) {
+        // msMatch[1] is the time part, msMatch[3] is the milliseconds.
+        timePart = msMatch[1];
+        msPart = msMatch[3];
+    } else {
+        // No separator found, the whole string is the time part.
+        timePart = trimmedTimestamp;
+    }
+
+    const timeSegments = timePart.split(':').filter(s => s); // filter out empty strings
+
     let hours = '00', minutes = '00', seconds = '00';
 
     if (timeSegments.length === 3) { // HH:MM:SS
@@ -103,12 +101,12 @@ export const parseSrt = (srtContent: string): SrtEntryData[] => {
     if (lines.length < 2) continue; // Allow text to be empty
 
     const index = parseInt(lines[0], 10);
-    const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+    const timeMatch = lines[1].match(/(.*?)\s*-->\s*(.*)/);
     
     if (isNaN(index) || !timeMatch) continue;
     
-    const startTime = timeMatch[1];
-    const endTime = timeMatch[2];
+    const startTime = normalizeTimestamp(timeMatch[1]);
+    const endTime = normalizeTimestamp(timeMatch[2]);
     const text = lines.slice(2).join('\n');
 
     entries.push({ index, startTime, endTime, text });
@@ -121,44 +119,97 @@ export const serializeSrt = (entries: SrtEntryData[]): string => {
     .map((entry, i) => {
       // Re-index on serialization to ensure correctness
       const index = i + 1;
-      // Normalize timestamps to ensure correct format on output.
-      const startTime = normalizeTimestamp(entry.startTime);
-      const endTime = normalizeTimestamp(entry.endTime);
+      // Normalize timestamps to the app's internal format (HH:MM:SS,mmm).
+      const normalizedStartTime = normalizeTimestamp(entry.startTime);
+      const normalizedEndTime = normalizeTimestamp(entry.endTime);
+
+      // Timestamps are already in the correct SRT format (HH:MM:SS,mmm)
+      const srtStartTime = normalizedStartTime;
+      const srtEndTime = normalizedEndTime;
+      
       // Ensure all line breaks are CRLF for better compatibility.
       const textWithCrlf = entry.text.replace(/\r?\n/g, '\r\n');
-      return `${index}\r\n${startTime} --> ${endTime}\r\n${textWithCrlf}`;
+      return `${index}\r\n${srtStartTime} --> ${srtEndTime}\r\n${textWithCrlf}`;
     })
     .join('\r\n\r\n');
 };
 
 /**
- * Converts an SRT format string to a WebVTT format string.
+ * Converts an SRT format string to a WebVTT format string with centered cues.
  * @param srtContent The string content of the .srt file.
  * @returns A string in WebVTT format.
  */
 export const srtToVtt = (srtContent: string): string => {
   if (!srtContent) return 'WEBVTT';
 
-  // Basic VTT header
-  let vtt = 'WEBVTT\n\n';
+  // VTT header
+  const vttHeader = 'WEBVTT\n\n';
 
-  // Replace SRT's comma decimal separator with a period for VTT
-  const vttContent = srtContent.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-  
-  // Split into blocks and remove SRT numeric indices
-  const blocks = vttContent.trim().split(/\r?\n\s*\r?\n/);
-  
-  const processedBlocks = blocks.map(block => {
+  // Split SRT into individual subtitle blocks
+  const blocks = srtContent.trim().split(/\r?\n\s*\r?\n/);
+
+  const vttBlocks = blocks.map(block => {
     const lines = block.split(/\r?\n/);
-    if (lines.length > 1 && lines[0].match(/^\d+$/)) {
-      // This is a standard SRT block with an index, remove the index.
-      return lines.slice(1).join('\n');
+    if (lines.length < 2) {
+      return ''; // Invalid block
     }
-    // If it doesn't look like a standard block (e.g., no index), return as is.
-    return block;
-  });
-  
-  vtt += processedBlocks.join('\n\n');
 
-  return vtt;
+    // Find the timestamp line, which contains "-->"
+    const timestampIndex = lines.findIndex(line => line.includes('-->'));
+    if (timestampIndex === -1) {
+      return ''; // No timestamp found, invalid block
+    }
+
+    let timestampLine = lines[timestampIndex];
+    // 1. Replace SRT's comma decimal separator with a period for VTT
+    timestampLine = timestampLine.replace(/,(\d{3})/g, '.$1');
+    // 2. Add positioning settings to center the subtitles and ensure wrapping
+    timestampLine += ' line:45% position:50% align:middle size:80%';
+
+    // The text is all lines after the timestamp
+    const textLines = lines.slice(timestampIndex + 1);
+
+    // Reconstruct the VTT cue, joining the text lines
+    return `${timestampLine}\n${textLines.join('\n')}`;
+  }).filter(block => block).join('\n\n'); // Filter out any empty/invalid blocks
+
+  return vttHeader + vttBlocks;
+};
+
+/**
+ * Converts a total number of milliseconds to a [mm:ss.xx] LRC timestamp string.
+ * @param totalMs The total number of milliseconds.
+ * @returns An LRC timestamp string.
+ */
+export const msToLrcTimestamp = (totalMs: number): string => {
+    if (totalMs < 0) totalMs = 0;
+    
+    const totalSeconds = Math.floor(totalMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const centiseconds = Math.floor((totalMs % 1000) / 10);
+
+    const paddedMinutes = String(minutes).padStart(2, '0');
+    const paddedSeconds = String(seconds).padStart(2, '0');
+    const paddedCentiseconds = String(centiseconds).padStart(2, '0');
+
+    return `[${paddedMinutes}:${paddedSeconds}.${paddedCentiseconds}]`;
+};
+
+/**
+ * Converts SRT data to LRC format.
+ * Each entry becomes a line: [mm:ss.xx]Lyric text
+ * @param entries The array of SRT entry data.
+ * @returns A string in LRC format.
+ */
+export const serializeLrc = (entries: SrtEntryData[]): string => {
+    return entries
+      .map(entry => {
+        const timestampMs = timestampToMs(entry.startTime);
+        const lrcTimestamp = msToLrcTimestamp(timestampMs);
+        // LRC format is typically single-line. Join multi-line text.
+        const text = entry.text.replace(/\r?\n/g, ' ');
+        return `${lrcTimestamp}${text}`;
+      })
+      .join('\r\n');
 };

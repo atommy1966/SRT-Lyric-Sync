@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { UploadIcon } from './icons';
+import { MusicNoteIcon, UploadIcon } from './icons';
 
 interface FileUploadProps {
   videoFile: File | null;
@@ -27,18 +26,30 @@ const FileUpload: React.FC<FileUploadProps> = ({ videoFile, setVideoFile, disabl
     }
   };
 
+  const isAudio = videoFile?.type.startsWith('audio/');
+
   if (videoFile && videoUrl) {
     return (
-      <div className="relative group bg-black rounded-lg">
-        <video src={videoUrl} controls className="w-full rounded-lg max-h-[22rem] aspect-video object-contain" aria-label="Video preview">
+      <div className="relative group bg-black rounded-lg aspect-video flex items-center justify-center">
+        {isAudio && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+                <MusicNoteIcon className="w-24 h-24 text-gray-600" />
+            </div>
+        )}
+        <video 
+            src={videoUrl} 
+            controls 
+            className="w-full h-full rounded-lg object-contain relative z-10 bg-transparent"
+            aria-label={isAudio ? "Audio preview" : "Video preview"}
+        >
           Your browser does not support the video tag.
         </video>
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
           <button
             onClick={() => setVideoFile(null)}
             disabled={disabled}
             className="px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all"
-            aria-label="Remove video"
+            aria-label="Remove media"
           >
             Remove
           </button>
@@ -58,9 +69,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ videoFile, setVideoFile, disabl
         <div className="flex flex-col items-center justify-center pt-5 pb-6">
           <UploadIcon className="w-10 h-10 mb-3 text-gray-400" />
           <p className="mb-2 text-sm text-gray-400"><span className="font-semibold text-teal-400">Click to upload</span> or drag and drop</p>
-          <p className="text-xs text-gray-500">MP4, MOV, WEBM, etc.</p>
+          <p className="text-xs text-gray-500">Video (MP4, MOV) or Audio (MP3, WAV)</p>
         </div>
-        <input id="dropzone-file" type="file" className="hidden" accept="video/*" onChange={handleFileChange} disabled={disabled} />
+        <input id="dropzone-file" type="file" className="hidden" accept="video/*,audio/*" onChange={handleFileChange} disabled={disabled} />
       </label>
     </div>
   );

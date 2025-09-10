@@ -146,7 +146,7 @@ const App: React.FC = () => {
 
   const handleGenerate = useCallback(async () => {
     if (!videoFile || !lyrics) {
-      setError("Please provide both a video file and the lyrics.");
+      setError("Please provide both a media file and the lyrics.");
       return;
     }
 
@@ -172,7 +172,7 @@ const App: React.FC = () => {
   
   const handleRefineTimings = useCallback(async () => {
     if (!videoFile) {
-        setError("Please upload the video file to use the refine feature.");
+        setError("Please upload the media file to use the refine feature.");
         return;
     }
     if (srtEntries.length === 0) {
@@ -201,7 +201,7 @@ const App: React.FC = () => {
     if (draftToRestore) {
         resetSrtEntries(draftToRestore.entries);
         setOffset(draftToRestore.offset || 0);
-        setError("Draft restored. Please re-upload the video to use the preview and refine functions.");
+        setError("Draft restored. Please re-upload the original media file to use the preview and refine functions.");
         // Clear the info message after a few seconds
         setTimeout(() => setError(null), 6000);
     }
@@ -234,6 +234,12 @@ const App: React.FC = () => {
       {label}
     </button>
   );
+
+  const isAudio = videoFile?.type.startsWith('audio/');
+  const uploadBoxTitle = videoFile 
+    ? (isAudio ? '1. Preview Audio' : '1. Preview Video')
+    : '1. Upload Video or Audio';
+
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans">
@@ -275,7 +281,7 @@ const App: React.FC = () => {
             <div className="flex flex-col gap-8">
                 <div className="p-6 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700">
                 <h2 className="text-xl font-semibold mb-4 text-gray-200">
-                    {videoFile ? '1. Preview Video' : '1. Upload Video'}
+                    {uploadBoxTitle}
                 </h2>
                 <FileUpload 
                     videoFile={videoFile} 

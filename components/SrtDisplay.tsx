@@ -4,6 +4,7 @@ import { serializeSrt, SrtEntryData, msToTimestamp, timestampToMs } from '../uti
 import SrtEntry from './SrtEntry';
 import Loader from './Loader';
 import ContextMenu from './ContextMenu';
+import DownloadDialog from './DownloadDialog';
 
 interface SrtDisplayProps {
   entries: SrtEntryData[];
@@ -42,6 +43,7 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
   
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -62,28 +64,13 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
     setOffset(newOffsetValue);
   };
 
-  const getCurrentSrtContent = () => {
-    return serializeSrt(entries);
-  };
-
   const handleCopy = () => {
-    navigator.clipboard.writeText(getCurrentSrtContent());
+    navigator.clipboard.writeText(serializeSrt(entries));
     setCopied(true);
   };
 
   const handleDownload = () => {
-    const content = getCurrentSrtContent();
-    const bom = '\uFEFF';
-    const blob = new Blob([bom + content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const baseName = videoFileName.substring(0, videoFileName.lastIndexOf('.')) || 'lyrics';
-    a.download = `${baseName}.srt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setIsDownloadDialogOpen(true);
   };
   
   const handleUpdate = (index: number, field: keyof SrtEntryData, value: string | number) => {
@@ -226,6 +213,12 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
 
   return (
     <div className="bg-gray-800 rounded-lg h-full flex flex-col relative" onClick={contextMenu ? closeContextMenu : undefined}>
+      <DownloadDialog 
+        isOpen={isDownloadDialogOpen}
+        onClose={() => setIsDownloadDialogOpen(false)}
+        entries={entries}
+        videoFileName={videoFileName}
+      />
       {isRefining && (
           <div className="absolute inset-0 z-30 rounded-lg">
               <Loader message="Refining timings..." />
@@ -265,7 +258,7 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
             <button onClick={handleCopy} disabled={allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Copy to clipboard">
                 {copied ? <span className="text-sm text-teal-400">Copied!</span> : <CopyIcon className="w-5 h-5" />}
             </button>
-            <button onClick={handleDownload} disabled={allControlsDisabled} className="flex items-center px-3 py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Download .srt file">
+            <button onClick={handleDownload} disabled={allControlsDisabled} className="flex items-center px-3 py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Download subtitle file">
                 <DownloadIcon className="w-5 h-5 mr-2" />
                 Download
             </button>
