@@ -4,8 +4,6 @@
 
 # Run and deploy your AI Studio app
 
-Upload a audio or a video with audio and provide the full lyrics to automatically generate a synchronized SRT,VTT,LRC subtitle file using AI.
-
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/drive/1Ip8QTAlYMcVD3vXfjPqTSroORKYCJLhG
