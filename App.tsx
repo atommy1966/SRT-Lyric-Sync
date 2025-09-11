@@ -7,7 +7,7 @@ import FileUpload from './components/FileUpload';
 import LyricsInput from './components/LyricsInput';
 import SrtDisplay from './components/SrtDisplay';
 import Loader from './components/Loader';
-import { SrtEntryData, msToTimestamp, timestampToMs } from './utils/srtUtils';
+import { SrtEntryData, msToTimestamp, timestampToMs, parseSrt, parseVtt, parseLrc } from './utils/srtUtils';
 import { ArchiveBoxIcon, ArrowPathIcon, DownloadIcon, EditIcon, PlayIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon } from './components/icons';
 import VideoPreview from './components/VideoPreview';
 import DownloadDialog from './components/DownloadDialog';
@@ -62,6 +62,7 @@ interface SavedDraft {
     videoFileName: string | null;
     timestamp: string;
     offset: number;
+    endTimePadding: number;
 }
 
 const MAX_FILE_SIZE_MB = 15;
@@ -83,6 +84,7 @@ const App: React.FC = () => {
   } = useHistoryState<SrtEntryData[]>([]);
 
   const [offset, setOffset] = useState<number>(0);
+  const [endTimePadding, setEndTimePadding] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [isRefining, setIsRefining] = useState<boolean>(false);
@@ -102,9 +104,12 @@ const App: React.FC = () => {
       if (savedDraftJSON) {
         const savedDraft = JSON.parse(savedDraftJSON) as SavedDraft;
         if (savedDraft.entries && Array.isArray(savedDraft.entries) && savedDraft.entries.length > 0) {
-          // Add default offset if missing from old drafts
+          // Add default values if missing from old drafts
           if (typeof savedDraft.offset === 'undefined') {
               savedDraft.offset = 0;
+          }
+          if (typeof savedDraft.endTimePadding === 'undefined') {
+              savedDraft.endTimePadding = 0;
           }
           setDraftToRestore(savedDraft);
         }
@@ -124,9 +129,9 @@ const App: React.FC = () => {
             const draft: SavedDraft = {
                 entries: srtEntries,
                 videoFileName: videoFile?.name || null,
-                // FIX: Corrected typo in Date constructor
                 timestamp: new Date().toISOString(),
                 offset: offset,
+                endTimePadding: endTimePadding,
             };
             localStorage.setItem('srtLyricSyncDraft', JSON.stringify(draft));
         } else {
@@ -138,7 +143,7 @@ const App: React.FC = () => {
     return () => {
         clearTimeout(handler);
     };
-  }, [srtEntries, videoFile, isLoading, isRefining, offset]);
+  }, [srtEntries, videoFile, isLoading, isRefining, offset, endTimePadding]);
 
 
   useEffect(() => {
@@ -156,6 +161,38 @@ const App: React.FC = () => {
     // Cleanup the object URL when the component unmounts or the file changes
     return () => URL.revokeObjectURL(objectUrl);
   }, [videoFile]);
+
+  // Spacebar play/pause functionality
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Do nothing if there's no video loaded or if it's loading/refining
+      if (!videoRef.current || isLoading || isRefining) {
+        return;
+      }
+      
+      const activeElement = document.activeElement;
+      const isTyping = activeElement && (
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' ||
+        (activeElement as HTMLElement).isContentEditable
+      );
+
+      if (event.code === 'Space' && !isTyping) {
+        event.preventDefault(); // Prevent default spacebar action (like scrolling)
+        if (videoRef.current.paused) {
+          videoRef.current.play();
+        } else {
+          videoRef.current.pause();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isLoading, isRefining]);
 
   const handleFileSelect = (file: File | null) => {
     // If null, it's a removal, just proceed
@@ -183,6 +220,7 @@ const App: React.FC = () => {
     setError(null);
     resetSrtEntries([]);
     setOffset(0);
+    setEndTimePadding(0);
     // The old draft will be overwritten by the auto-save effect upon successful generation.
 
     try {
@@ -261,6 +299,20 @@ const App: React.FC = () => {
     setOffset(newOffsetValue);
   };
   
+  const handleEndTimePaddingChange = (newPadding: number) => {
+    const diff = newPadding - endTimePadding;
+    if (diff === 0) return;
+
+    setSrtEntries(currentEntries => currentEntries.map(entry => {
+        const newEndTime = timestampToMs(entry.endTime) + diff;
+        return {
+            ...entry,
+            endTime: msToTimestamp(newEndTime),
+        };
+    }));
+    setEndTimePadding(newPadding);
+  };
+
   const handleSetTimeToCurrent = (entryIndex: number, field: 'startTime' | 'endTime') => {
     if (!videoRef.current) return;
     const currentTimeMs = videoRef.current.currentTime * 1000;
@@ -288,6 +340,7 @@ const App: React.FC = () => {
     if (draftToRestore) {
         resetSrtEntries(draftToRestore.entries);
         setOffset(draftToRestore.offset || 0);
+        setEndTimePadding(draftToRestore.endTimePadding || 0);
         setError("Draft restored. Please re-upload the original media file to use the preview and refine functions.");
         // Clear the info message after a few seconds
         setTimeout(() => setError(null), 6000);
@@ -298,6 +351,57 @@ const App: React.FC = () => {
   const handleDismissDraft = () => {
     localStorage.removeItem('srtLyricSyncDraft');
     setDraftToRestore(null);
+  };
+
+  const handleImportSubtitles = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const content = e.target?.result as string;
+        if (!content) {
+            setError('File is empty or could not be read.');
+            return;
+        }
+
+        try {
+            let parsedEntries: SrtEntryData[] = [];
+            const extension = file.name.split('.').pop()?.toLowerCase();
+            
+            switch (extension) {
+                case 'srt':
+                    parsedEntries = parseSrt(content);
+                    break;
+                case 'vtt':
+                    parsedEntries = parseVtt(content);
+                    break;
+                case 'lrc':
+                    parsedEntries = parseLrc(content);
+                    break;
+                default:
+                    setError(`Unsupported file type: .${extension}`);
+                    return;
+            }
+
+            if (parsedEntries.length === 0) {
+                setError('No valid subtitle entries found in the file.');
+                return;
+            }
+
+            setError(null);
+            setLyrics(''); // Clear lyrics input
+            resetSrtEntries(parsedEntries);
+            setOffset(0);
+            setEndTimePadding(0);
+
+        } catch (err) {
+            console.error('Error parsing subtitle file:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            setError(`Failed to parse file: ${errorMessage}`);
+        }
+    };
+    reader.onerror = () => {
+        setError('Error reading the file.');
+    };
+    reader.readAsText(file);
   };
 
 
@@ -376,19 +480,26 @@ const App: React.FC = () => {
                 <div className="p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col flex-grow min-h-0">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-lg font-semibold text-gray-200">2. Provide Lyrics</h2>
-                        <button
-                            onClick={handleGenerate}
-                            disabled={!canGenerate}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out
-                                        bg-teal-600 hover:bg-teal-500
-                                        disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed
-                                        focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none"
-                        >
-                            <SparklesIcon className="w-5 h-5" />
-                            {isLoading ? 'Generating...' : 'Generate'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                             <button
+                                onClick={handleGenerate}
+                                disabled={!canGenerate}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out
+                                            bg-teal-600 hover:bg-teal-500
+                                            disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed
+                                            focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none"
+                            >
+                                <SparklesIcon className="w-5 h-5" />
+                                {isLoading ? 'Generating...' : 'Generate'}
+                            </button>
+                        </div>
                     </div>
-                    <LyricsInput lyrics={lyrics} setLyrics={setLyrics} disabled={isLoading || isRefining} />
+                    <LyricsInput 
+                        lyrics={lyrics} 
+                        setLyrics={setLyrics} 
+                        disabled={isLoading || isRefining}
+                        onImport={handleImportSubtitles}
+                    />
                 </div>
             </div>
 
@@ -408,7 +519,7 @@ const App: React.FC = () => {
                     {!isLoading && !error && srtEntries.length > 0 && videoFile && videoUrl ? (
                          <div className="flex flex-col flex-grow min-h-0">
                             {/* Video Player Area */}
-                            <div className="relative bg-black flex-shrink-0 border-b-2 border-gray-700/50 max-h-[45vh] p-2">
+                            <div className="relative bg-black flex-shrink-0 border-b-2 border-gray-700/50 max-h-[35vh] p-2">
                                 <VideoPreview 
                                     ref={videoRef}
                                     videoFile={videoFile} 
@@ -446,8 +557,9 @@ const App: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
-                            {/* Global Offset Control */}
-                             <div className={`p-3 bg-gray-900/50 border-b border-gray-700 transition-all flex-shrink-0 ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`}>
+                            {/* Timing Controls */}
+                             <div className={`p-3 bg-gray-900/50 border-b border-gray-700 transition-all space-y-4 flex-shrink-0 ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`}>
+                                {/* Global Offset */}
                                 <div>
                                     <label htmlFor="timing-offset-slider" className="block text-sm font-medium text-gray-300 mb-2">Global Timing Offset</label>
                                     <div className="flex items-center gap-3">
@@ -456,7 +568,7 @@ const App: React.FC = () => {
                                             type="range"
                                             min="-5000"
                                             max="5000"
-                                            step="1"
+                                            step="10"
                                             value={offset}
                                             onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10))}
                                             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
@@ -468,11 +580,44 @@ const App: React.FC = () => {
                                             value={offset}
                                             onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10) || 0)}
                                             className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
-                                            step="1"
+                                            step="10"
                                             aria-label="Timing offset in milliseconds"
                                             disabled={allControlsDisabled}
                                         />
                                         <button onClick={() => handleOffsetChange(0)} disabled={offset === 0 || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Reset offset">
+                                            <ArrowPathIcon className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* End Time Padding */}
+                                <div>
+                                    <label htmlFor="end-time-padding-slider" className="block text-sm font-medium text-gray-300 mb-2" title="Adds a small delay to the end of each subtitle to account for vocal decay.">
+                                      Vocal Decay Helper (End Time Padding)
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            id="end-time-padding-slider"
+                                            type="range"
+                                            min="0"
+                                            max="2000"
+                                            step="10"
+                                            value={endTimePadding}
+                                            onChange={(e) => handleEndTimePaddingChange(parseInt(e.target.value, 10))}
+                                            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
+                                            disabled={allControlsDisabled}
+                                            title={`+${endTimePadding}ms`}
+                                        />
+                                        <input
+                                            type="number"
+                                            value={endTimePadding}
+                                            onChange={(e) => handleEndTimePaddingChange(parseInt(e.target.value, 10) || 0)}
+                                            className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
+                                            step="10"
+                                            min="0"
+                                            aria-label="End time padding in milliseconds"
+                                            disabled={allControlsDisabled}
+                                        />
+                                        <button onClick={() => handleEndTimePaddingChange(0)} disabled={endTimePadding === 0 || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Reset padding">
                                             <ArrowPathIcon className="w-5 h-5" />
                                         </button>
                                     </div>

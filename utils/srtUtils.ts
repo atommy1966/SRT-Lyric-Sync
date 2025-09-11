@@ -125,6 +125,76 @@ export const parseSrt = (srtContent: string): SrtEntryData[] => {
   return entries;
 };
 
+export const parseVtt = (vttContent: string): SrtEntryData[] => {
+    if (!vttContent) return [];
+    
+    const entries: SrtEntryData[] = [];
+    const blocks = vttContent.trim().replace(/^WEBVTT\s*/, '').split(/\r?\n\s*\r?\n/);
+    let entryIndex = 1;
+
+    for (const block of blocks) {
+        const lines = block.trim().split(/\r?\n/);
+        if (lines.length === 0) continue;
+
+        const timeMatch = lines[0].match(/(.*?)\s*-->\s*(.*?)(?:\s+.*)?$/);
+
+        if (timeMatch) {
+            const startTime = normalizeTimestamp(timeMatch[1]);
+            const endTime = normalizeTimestamp(timeMatch[2]);
+            const text = lines.slice(1).join('\n');
+            
+            entries.push({ index: entryIndex++, startTime, endTime, text });
+        }
+    }
+    return entries;
+};
+
+
+const lrcTimestampToMs = (lrcTimestamp: string): number => {
+    const match = lrcTimestamp.match(/(\d{2}):(\d{2})\.(\d{2})/);
+    if (!match) return 0;
+    const [, minutes, seconds, centiseconds] = match;
+    return (parseInt(minutes, 10) * 60 + parseInt(seconds, 10)) * 1000 + parseInt(centiseconds, 10) * 10;
+};
+
+export const parseLrc = (lrcContent: string): SrtEntryData[] => {
+    if (!lrcContent) return [];
+
+    const timedLines: { timeMs: number, text: string }[] = [];
+    const lines = lrcContent.trim().split(/\r?\n/);
+
+    const lineRegex = /\[(\d{2}:\d{2}\.\d{2})\](.*)/;
+
+    for (const line of lines) {
+        const match = line.match(lineRegex);
+        if (match) {
+            const timeMs = lrcTimestampToMs(match[1]);
+            const text = match[2].trim();
+            if (text) { // Only add lines that have text
+                timedLines.push({ timeMs, text });
+            }
+        }
+    }
+
+    if (timedLines.length === 0) return [];
+
+    return timedLines.map((line, i) => {
+        const startTimeMs = line.timeMs;
+        // The end time is the start of the next line, or 3 seconds after the start for the last line.
+        const endTimeMs = (i < timedLines.length - 1) 
+            ? timedLines[i + 1].timeMs 
+            : startTimeMs + 3000;
+
+        return {
+            index: i + 1,
+            startTime: msToTimestamp(startTimeMs),
+            endTime: msToTimestamp(endTimeMs),
+            text: line.text,
+        };
+    });
+};
+
+
 export const serializeSrt = (entries: SrtEntryData[]): string => {
   return entries
     .map((entry, i) => {

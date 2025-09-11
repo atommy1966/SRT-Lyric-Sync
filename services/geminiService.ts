@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { SrtEntryData, normalizeTimestamp } from "../utils/srtUtils";
 
@@ -179,10 +180,11 @@ Your task is to analyze the audio from the provided video and adjust the timings
 **Output:** You must return the full, updated list of subtitles in the exact same JSON array format.
 
 **IMPORTANT Rules:**
-1.  Adjust the \`startTime\` and \`endTime\` for each entry to perfectly match the audio.
-2.  DO NOT change the \`text\`, \`index\`, or the order of the entries.
-3.  Ensure timestamps are in \`HH:MM:SS,ms\` format. **Crucially, use a comma (,) before the milliseconds.**
-4.  Your entire response must be ONLY the JSON array. Do not add any extra text, explanations, or markdown formatting.
+1.  Adjust the \`startTime\` and \`endTime\` for each entry to perfectly match when the vocals for that line are sung.
+2.  **Crucially for \`endTime\`, the timestamp must mark the *very end* of the vocal phrase. This includes sustained notes (long tones), reverberation, and vocal trails. The subtitle should remain visible until the singer's voice for that specific text has completely faded or the next sung line begins.**
+3.  DO NOT change the \`text\`, \`index\`, or the order of the entries.
+4.  Ensure timestamps are in \`HH:MM:SS,ms\` format. **Use a comma (,) before the milliseconds.**
+5.  Your entire response must be ONLY the JSON array. Do not add any extra text, explanations, or markdown formatting.
 
 **Subtitles to refine:**
 ---

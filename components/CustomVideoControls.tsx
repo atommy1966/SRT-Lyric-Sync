@@ -66,7 +66,7 @@ const CustomVideoControls: React.FC<CustomVideoControlsProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button onClick={onPlayPause} className="text-white hover:text-teal-400 transition-colors" aria-label={isPlaying ? "Pause" : "Play"}>
-            {isPlaying ? <PauseIcon className="w-7 h-7" /> : <PlayIcon className="w-7 h-7" />}
+            {isPlaying ? <PauseIcon className="w-8 h-8" /> : <PlayIcon className="w-8 h-8" />}
           </button>
 
           <div className="flex items-center gap-2">
