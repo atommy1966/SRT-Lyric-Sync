@@ -64,6 +64,9 @@ interface SavedDraft {
     offset: number;
 }
 
+const MAX_FILE_SIZE_MB = 15;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 
 const App: React.FC = () => {
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -150,6 +153,22 @@ const App: React.FC = () => {
     // Cleanup the object URL when the component unmounts or the file changes
     return () => URL.revokeObjectURL(objectUrl);
   }, [videoFile]);
+
+  const handleFileSelect = (file: File | null) => {
+    // If null, it's a removal, just proceed
+    if (!file) {
+        setVideoFile(null);
+        return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+        setError(`File is too large. Please select a file smaller than ${MAX_FILE_SIZE_MB}MB.`);
+        setVideoFile(null); // Clear any existing file
+        return;
+    }
+    setError(null); // Clear previous errors
+    setVideoFile(file);
+  };
 
   const handleGenerate = useCallback(async () => {
     if (!videoFile || !lyrics) {
@@ -342,7 +361,7 @@ const App: React.FC = () => {
                   </div>
                   <FileUpload 
                       videoFile={videoFile} 
-                      setVideoFile={setVideoFile} 
+                      setVideoFile={handleFileSelect} 
                       disabled={isLoading || isRefining}
                       videoUrl={videoUrl}
                   />

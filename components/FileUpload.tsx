@@ -89,6 +89,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ videoFile, setVideoFile, disabl
           <UploadIcon className="w-10 h-10 mb-3 text-gray-400" />
           <p className="mb-2 text-sm text-gray-400"><span className="font-semibold text-teal-400">Click to upload</span> or drag and drop</p>
           <p className="text-xs text-gray-500">Video (MP4, MOV) or Audio (MP3, WAV)</p>
+          <p className="text-xs text-gray-500">Max file size: 15MB</p>
         </div>
         <input id="dropzone-file" type="file" className="hidden" accept="video/*,audio/*" onChange={handleFileChange} disabled={disabled} />
       </label>
