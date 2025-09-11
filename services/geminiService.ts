@@ -201,14 +201,25 @@ ${JSON.stringify(currentEntries, null, 2)}
 
         const refinedEntries = processAiResponse(response.text);
 
-        // As a final safety check, ensure the refined entries match the original text and order
-        if (refinedEntries.length !== currentEntries.length || 
-            refinedEntries.some((entry, i) => entry.text !== currentEntries[i].text)) {
-            console.error("Refinement process failed: AI altered the subtitle text or count.", { original: currentEntries, refined: refinedEntries });
-            throw new Error("The AI failed to follow instructions and altered the subtitle text. Please try again.");
+        // New, more resilient safety check.
+        // First, ensure the AI returned the correct number of subtitle lines. This is a critical failure.
+        if (refinedEntries.length !== currentEntries.length) {
+            console.error("Refinement process failed: AI returned a different number of entries.", { originalCount: currentEntries.length, refinedCount: refinedEntries.length });
+            throw new Error("The AI failed to follow instructions and changed the number of subtitle lines. Please try again.");
         }
 
-        return refinedEntries;
+        // If the line count is correct, merge the refined timings with the original text.
+        // This makes the process resilient to small, unintentional text changes by the AI (e.g., punctuation).
+        const resilientRefinedEntries = currentEntries.map((originalEntry, i) => {
+            const refinedEntry = refinedEntries[i];
+            return {
+                ...originalEntry, // Keeps original index and text.
+                startTime: refinedEntry.startTime, // Uses refined start time (already normalized).
+                endTime: refinedEntry.endTime,   // Uses refined end time (already normalized).
+            };
+        });
+
+        return resilientRefinedEntries;
 
     } catch (error) {
         console.error("Error refining SRT timings:", error);

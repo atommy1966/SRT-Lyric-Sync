@@ -1,16 +1,20 @@
 
 
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { SrtEntryData } from '../utils/srtUtils';
+import { SrtEntryData, msToTimestamp, timestampToMs } from '../utils/srtUtils';
 import SrtEntry from './SrtEntry';
 import Loader from './Loader';
 import ContextMenu from './ContextMenu';
 
 interface SrtDisplayProps {
   entries: SrtEntryData[];
-  setEntries: React.Dispatch<React.SetStateAction<SrtEntryData[]>>;
+  setEntries: (updater: (prevEntries: SrtEntryData[]) => SrtEntryData[]) => void;
   isRefining: boolean;
+  onSetTimeToCurrent: (entryIndex: number, field: 'startTime' | 'endTime') => void;
+  currentTime: number;
+  onEntryClick: (entry: SrtEntryData) => void;
+  activeIndex: number | null;
+  setActiveIndex: (index: number | null) => void;
 }
 
 interface ContextMenuState {
@@ -38,18 +42,61 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
     entries, 
     setEntries, 
     isRefining,
+    onSetTimeToCurrent,
+    currentTime,
+    onEntryClick,
+    activeIndex,
+    setActiveIndex
 }) => {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const listContainerRef = useRef<HTMLDivElement>(null); // Ref for the inner list container
+  const previousCurrentIndexRef = useRef<number | null>(null); // Ref to track the last active index for scrolling
   const prevEntriesLength = usePrevious(entries.length);
+  const justInsertedInMiddleRef = useRef(false);
 
+  // Auto-scroll to the currently playing subtitle
   useEffect(() => {
+    // Determine the array index of the currently playing entry
+    const currentTimeMs = currentTime * 1000;
+    const currentIndex = entries.findIndex(entry => {
+        const startTimeMs = timestampToMs(entry.startTime);
+        const endTimeMs = timestampToMs(entry.endTime);
+        return currentTimeMs >= startTimeMs && currentTimeMs < endTimeMs;
+    });
+
+    // Only scroll if the active entry has changed and is visible in the list
+    if (currentIndex !== -1 && currentIndex !== previousCurrentIndexRef.current) {
+      const list = listContainerRef.current;
+      if (list && list.children[currentIndex]) {
+        const element = list.children[currentIndex] as HTMLElement;
+        // The element is scrolled into view smoothly, centered vertically.
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }
+    }
+    
+    // Update the ref to track the last scrolled-to index
+    previousCurrentIndexRef.current = currentIndex;
+  }, [currentTime, entries]);
+
+
+  // Scroll to the bottom when a new line is added via the main button
+  useEffect(() => {
+      // If we just inserted an item in the middle, don't scroll to the bottom.
+      if (justInsertedInMiddleRef.current) {
+          justInsertedInMiddleRef.current = false;
+          return;
+      }
+
       // If a new entry was added (length increased), scroll to the bottom.
+      // This is intended for the main "Add Line" button.
       if (prevEntriesLength !== undefined && entries.length > prevEntriesLength) {
           const container = scrollContainerRef.current;
           if (container) {
@@ -60,14 +107,13 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
   }, [entries.length, prevEntriesLength]);
 
   const handleUpdate = (index: number, field: keyof SrtEntryData, value: string | number) => {
-    setEntries(currentEntries => {
-        const newEntries = [...currentEntries];
-        const entryToUpdate = newEntries.find(e => e.index === index);
-        if (entryToUpdate) {
-            (entryToUpdate[field] as string | number) = value;
-        }
-        return newEntries;
-    });
+    setEntries(currentEntries =>
+      currentEntries.map(entry =>
+        entry.index === index
+          ? { ...entry, [field]: value }
+          : entry
+      )
+    );
   };
   
   const handleDelete = useCallback((index: number) => {
@@ -94,6 +140,7 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
   }, [setEntries]);
 
   const handleInsert = useCallback((afterIndex: number) => {
+    justInsertedInMiddleRef.current = true; // Set the flag before updating state to prevent scrolling.
     setEntries(currentEntries => {
         const insertAtIndex = currentEntries.findIndex(e => e.index === afterIndex);
         if (insertAtIndex === -1) return currentEntries;
@@ -138,6 +185,56 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
         return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
     });
   }, [setEntries]);
+
+  const handleSplit = useCallback((indexToSplit: number, splitAt: number) => {
+    setEntries(currentEntries => {
+        const arrayIndex = currentEntries.findIndex(e => e.index === indexToSplit);
+        if (arrayIndex === -1) return currentEntries;
+
+        const originalEntry = currentEntries[arrayIndex];
+        const originalText = originalEntry.text;
+
+        if (splitAt <= 0 || splitAt >= originalText.length) {
+            return currentEntries; // Cannot split at the edges
+        }
+
+        const text1 = originalText.substring(0, splitAt).trim();
+        const text2 = originalText.substring(splitAt).trim();
+
+        if (!text1 || !text2) {
+             // Avoid creating empty entries if splitting results in one empty part
+            return currentEntries;
+        }
+        
+        const startTimeMs = timestampToMs(originalEntry.startTime);
+        const endTimeMs = timestampToMs(originalEntry.endTime);
+        const durationMs = endTimeMs - startTimeMs;
+        
+        let splitTimeMs = startTimeMs;
+        if (durationMs > 0) {
+            splitTimeMs = startTimeMs + Math.round(durationMs * (splitAt / originalText.length));
+        }
+
+        const updatedOriginalEntry = {
+            ...originalEntry,
+            endTime: msToTimestamp(splitTimeMs),
+            text: text1,
+        };
+
+        const newEntry: SrtEntryData = {
+            index: 0, // Will be re-indexed later
+            startTime: msToTimestamp(splitTimeMs),
+            endTime: originalEntry.endTime, // Use original end time
+            text: text2,
+        };
+        
+        const newEntries = [...currentEntries];
+        newEntries.splice(arrayIndex + 1, 0, newEntry);
+        newEntries[arrayIndex] = updatedOriginalEntry;
+
+        return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
+    });
+}, [setEntries]);
   
   const handleContextMenu = (e: React.MouseEvent, entry: SrtEntryData, isFirst: boolean, isLast: boolean) => {
       e.preventDefault();
@@ -202,31 +299,41 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
         className={`p-2 transition-all flex-grow min-h-0 overflow-y-auto ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`}
         onClick={() => setActiveIndex(null)}
       >
-        <div className="space-y-2">
-            {entries.map((entry, idx) => (
-                <SrtEntry 
-                    key={entry.index} 
-                    entry={entry}
-                    isFirst={idx === 0}
-                    isLast={idx === entries.length - 1}
-                    onUpdate={handleUpdate}
-                    onContextMenu={(e) => handleContextMenu(e, entry, idx === 0, idx === entries.length - 1)}
-                    // Highlight on click
-                    isActive={activeIndex === entry.index}
-                    onClick={(e) => {
-                        e.stopPropagation(); // Prevent container click from deselecting
-                        setActiveIndex(entry.index);
-                    }}
-                    // Drag & Drop props
-                    index={idx}
-                    isDragging={draggedIndex === idx}
-                    isDragOver={dragOverIndex === idx}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    onDragEnd={handleDragEnd}
-                />
-            ))}
+        <div className="space-y-2" ref={listContainerRef}>
+            {entries.map((entry, idx) => {
+                const currentTimeMs = currentTime * 1000;
+                const startTimeMs = timestampToMs(entry.startTime);
+                const endTimeMs = timestampToMs(entry.endTime);
+                const isCurrent = currentTimeMs >= startTimeMs && currentTimeMs < endTimeMs;
+                
+                return (
+                    <SrtEntry 
+                        key={entry.index} 
+                        entry={entry}
+                        isFirst={idx === 0}
+                        isLast={idx === entries.length - 1}
+                        onUpdate={handleUpdate}
+                        onSetTimeToCurrent={onSetTimeToCurrent}
+                        onContextMenu={(e) => handleContextMenu(e, entry, idx === 0, idx === entries.length - 1)}
+                        onSplit={handleSplit}
+                        // Highlight on click
+                        isActive={activeIndex === entry.index}
+                        isCurrent={isCurrent}
+                        onClick={(e) => {
+                            e.stopPropagation(); // Prevent container click from deselecting
+                            onEntryClick(entry);
+                        }}
+                        // Drag & Drop props
+                        index={idx}
+                        isDragging={draggedIndex === idx}
+                        isDragOver={dragOverIndex === idx}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        onDragEnd={handleDragEnd}
+                    />
+                );
+            })}
         </div>
       </div>
     </div>
