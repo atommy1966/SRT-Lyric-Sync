@@ -8,6 +8,7 @@ export interface SrtEntryData {
 /**
  * Normalizes a timestamp string to the strict HH:MM:SS,mmm format.
  * Handles variations with ',', '.', or ':' as millisecond separators.
+ * Handles rollover for seconds and minutes.
  * @param timestamp The raw timestamp string from any source.
  * @returns A strictly formatted timestamp string.
  */
@@ -18,36 +19,46 @@ export const normalizeTimestamp = (timestamp: string): string => {
 
     const trimmedTimestamp = timestamp.trim();
     // Use regex to find the time part and an optional ms part with various separators.
-    // This regex captures (everything before separator), (the separator), and (the milliseconds).
     const msMatch = trimmedTimestamp.match(/(.*)([.,:])(\d{1,3})$/);
     
     let timePart: string;
     let msPart = '000';
 
     if (msMatch) {
-        // msMatch[1] is the time part, msMatch[3] is the milliseconds.
         timePart = msMatch[1];
         msPart = msMatch[3];
     } else {
-        // No separator found, the whole string is the time part.
         timePart = trimmedTimestamp;
     }
 
-    const timeSegments = timePart.split(':').filter(s => s); // filter out empty strings
+    const timeSegments = timePart.split(':').map(s => s.trim()).filter(Boolean);
 
-    let hours = '00', minutes = '00', seconds = '00';
+    let hours = 0, minutes = 0, seconds = 0;
 
     if (timeSegments.length === 3) { // HH:MM:SS
-        [hours, minutes, seconds] = timeSegments;
+        hours = parseInt(timeSegments[0], 10) || 0;
+        minutes = parseInt(timeSegments[1], 10) || 0;
+        seconds = parseInt(timeSegments[2], 10) || 0;
     } else if (timeSegments.length === 2) { // MM:SS
-        [minutes, seconds] = timeSegments;
+        minutes = parseInt(timeSegments[0], 10) || 0;
+        seconds = parseInt(timeSegments[1], 10) || 0;
     } else if (timeSegments.length === 1 && timeSegments[0] !== '') { // SS
-        [seconds] = timeSegments;
+        seconds = parseInt(timeSegments[0], 10) || 0;
     }
 
-    const paddedHours = hours.padStart(2, '0');
-    const paddedMinutes = minutes.padStart(2, '0');
-    const paddedSeconds = seconds.padStart(2, '0');
+    // Handle seconds/minutes rollover (e.g., 95 seconds)
+    if (seconds >= 60) {
+        minutes += Math.floor(seconds / 60);
+        seconds %= 60;
+    }
+    if (minutes >= 60) {
+        hours += Math.floor(minutes / 60);
+        minutes %= 60;
+    }
+
+    const paddedHours = String(hours).padStart(2, '0');
+    const paddedMinutes = String(minutes).padStart(2, '0');
+    const paddedSeconds = String(seconds).padStart(2, '0');
     const paddedMs = msPart.padEnd(3, '0').substring(0, 3);
 
     return `${paddedHours}:${paddedMinutes}:${paddedSeconds},${paddedMs}`;

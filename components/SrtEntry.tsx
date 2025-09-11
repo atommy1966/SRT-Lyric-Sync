@@ -6,6 +6,8 @@ interface SrtEntryProps {
   entry: SrtEntryData;
   onUpdate: (index: number, field: keyof SrtEntryData, value: string | number) => void;
   onContextMenu: (event: React.MouseEvent) => void;
+  onClick: (event: React.MouseEvent) => void;
+  isActive: boolean;
   isFirst: boolean;
   isLast: boolean;
   // Drag & Drop props
@@ -21,7 +23,9 @@ interface SrtEntryProps {
 const SrtEntry: React.FC<SrtEntryProps> = ({ 
     entry, 
     onUpdate, 
-    onContextMenu, 
+    onContextMenu,
+    onClick,
+    isActive, 
     isFirst, 
     isLast,
     index,
@@ -80,13 +84,19 @@ const SrtEntry: React.FC<SrtEntryProps> = ({
     "items-start",
     "transition-all",
     "duration-200",
+    "cursor-pointer",
     isDragging ? "opacity-30" : "opacity-100",
-    isDragOver ? "ring-2 ring-teal-500" : ""
-  ].join(" ");
+    isDragOver 
+        ? "ring-2 ring-teal-500" 
+        : isActive 
+        ? "ring-2 ring-blue-500" 
+        : "hover:bg-gray-800/90",
+  ].filter(Boolean).join(" ");
 
   return (
     <div 
         className={containerClasses}
+        onClick={onClick}
         onContextMenu={onContextMenu}
         draggable
         onDragStart={(e) => onDragStart(e, index)}

@@ -29,18 +29,37 @@ const FileUpload: React.FC<FileUploadProps> = ({ videoFile, setVideoFile, disabl
   const isAudio = videoFile?.type.startsWith('audio/');
 
   if (videoFile && videoUrl) {
+    if (isAudio) {
+      return (
+        <div className="relative group bg-gray-800 rounded-lg p-4 flex items-center justify-center">
+          <audio
+            src={videoUrl}
+            controls
+            className="w-full relative z-10"
+            aria-label="Audio preview"
+          />
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+            <button
+              onClick={() => setVideoFile(null)}
+              disabled={disabled}
+              className="px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all"
+              aria-label="Remove media"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
+    // Video Preview
     return (
-      <div className="relative group bg-black rounded-lg aspect-video flex items-center justify-center">
-        {isAudio && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
-                <MusicNoteIcon className="w-24 h-24 text-gray-600" />
-            </div>
-        )}
+      <div className="relative group bg-black rounded-lg max-h-48 flex items-center justify-center">
         <video 
             src={videoUrl} 
             controls 
-            className="w-full h-full rounded-lg object-contain relative z-10 bg-transparent"
-            aria-label={isAudio ? "Audio preview" : "Video preview"}
+            className="w-full max-h-full max-w-full rounded-lg object-contain relative z-10 bg-transparent"
+            aria-label="Video preview"
         >
           Your browser does not support the video tag.
         </video>
@@ -64,7 +83,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ videoFile, setVideoFile, disabl
         htmlFor="dropzone-file"
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center w-full h-48 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer bg-gray-800 hover:bg-gray-700 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`flex flex-col items-center justify-center w-full h-40 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer bg-gray-800 hover:bg-gray-700 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <div className="flex flex-col items-center justify-center pt-5 pb-6">
           <UploadIcon className="w-10 h-10 mb-3 text-gray-400" />

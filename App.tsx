@@ -1,3 +1,5 @@
+
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { fileToBase64 } from './utils/fileUtils';
 import { generateSrtFromVideoAndLyrics, refineSrtTimings } from './services/geminiService';
@@ -5,9 +7,10 @@ import FileUpload from './components/FileUpload';
 import LyricsInput from './components/LyricsInput';
 import SrtDisplay from './components/SrtDisplay';
 import Loader from './components/Loader';
-import { SrtEntryData } from './utils/srtUtils';
-import { ArchiveBoxIcon, EditIcon, PlayIcon } from './components/icons';
+import { SrtEntryData, msToTimestamp, timestampToMs } from './utils/srtUtils';
+import { ArchiveBoxIcon, ArrowPathIcon, DownloadIcon, EditIcon, PlayIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon } from './components/icons';
 import VideoPreview from './components/VideoPreview';
+import DownloadDialog from './components/DownloadDialog';
 
 // Custom hook to manage state with undo/redo functionality
 const useHistoryState = <T,>(initialState: T) => {
@@ -78,10 +81,13 @@ const App: React.FC = () => {
 
   const [offset, setOffset] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [isRefining, setIsRefining] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'editor' | 'preview'>('editor');
   const [draftToRestore, setDraftToRestore] = useState<SavedDraft | null>(null);
+
+  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
 
   // Load draft from localStorage on initial mount
   useEffect(() => {
@@ -112,6 +118,7 @@ const App: React.FC = () => {
             const draft: SavedDraft = {
                 entries: srtEntries,
                 videoFileName: videoFile?.name || null,
+                // FIX: Corrected typo in Date constructor
                 timestamp: new Date().toISOString(),
                 offset: offset,
             };
@@ -158,15 +165,22 @@ const App: React.FC = () => {
     // The old draft will be overwritten by the auto-save effect upon successful generation.
 
     try {
+      setLoadingMessage("Step 1/2: Analyzing audio & syncing lyrics...");
       const videoBase64 = await fileToBase64(videoFile);
-      const srtData = await generateSrtFromVideoAndLyrics(videoBase64, videoFile.type, lyrics);
-      resetSrtEntries(srtData);
+      const initialSrtData = await generateSrtFromVideoAndLyrics(videoBase64, videoFile.type, lyrics);
+      
+      // Automatically refine the results for better accuracy
+      setLoadingMessage("Step 2/2: Refining timings for accuracy...");
+      const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
+
+      resetSrtEntries(refinedSrtData);
     } catch (e) {
       console.error(e);
       const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
       setError(`Failed to process: ${errorMessage}`);
     } finally {
       setIsLoading(false);
+      setLoadingMessage('');
     }
   }, [videoFile, lyrics, resetSrtEntries]);
   
@@ -196,6 +210,35 @@ const App: React.FC = () => {
     }
   }, [videoFile, srtEntries, setSrtEntries]);
 
+  const handleAddLine = () => {
+    setSrtEntries(currentEntries => {
+        const newIndex = currentEntries.length + 1;
+        const lastEntry = currentEntries[currentEntries.length - 1];
+        const newEntry: SrtEntryData = {
+        index: newIndex,
+        startTime: lastEntry?.endTime || '00:00:00,000',
+        endTime: lastEntry?.endTime || '00:00:00,000',
+        text: 'New subtitle'
+        };
+        return [...currentEntries, newEntry];
+    });
+  };
+
+  const handleOffsetChange = (newOffsetValue: number) => {
+    const diff = newOffsetValue - offset;
+    if (diff === 0) return;
+
+    setSrtEntries(currentEntries => currentEntries.map(entry => {
+        const newStartTime = timestampToMs(entry.startTime) + diff;
+        const newEndTime = timestampToMs(entry.endTime) + diff;
+        return {
+            ...entry,
+            startTime: msToTimestamp(newStartTime),
+            endTime: msToTimestamp(newEndTime),
+        };
+    }));
+    setOffset(newOffsetValue);
+  };
 
   const handleRestoreDraft = () => {
     if (draftToRestore) {
@@ -224,10 +267,10 @@ const App: React.FC = () => {
   }> = ({ label, icon, isActive, onClick }) => (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-200 ${
+      className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors duration-200 ${
         isActive
-          ? 'border-teal-400 text-teal-300'
-          : 'border-transparent text-gray-400 hover:text-white hover:border-gray-500'
+          ? 'bg-gray-700 text-white'
+          : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'
       }`}
     >
       {icon}
@@ -240,11 +283,19 @@ const App: React.FC = () => {
     ? (isAudio ? '1. Preview Audio' : '1. Preview Video')
     : '1. Upload Video or Audio';
 
+  const containerClasses = 'bg-gray-900 text-white font-sans flex flex-col min-h-screen lg:h-screen lg:overflow-hidden';
+  const allControlsDisabled = isRefining || isLoading;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-sans">
+    <div className={containerClasses}>
+        <DownloadDialog 
+            isOpen={isDownloadDialogOpen}
+            onClose={() => setIsDownloadDialogOpen(false)}
+            entries={srtEntries}
+            videoFileName={videoFile?.name ?? 'lyrics.srt'}
+        />
         {draftToRestore && (
-            <div className="bg-gray-800 border-b border-teal-800 text-center p-3 flex justify-center items-center gap-4 text-sm shadow-lg">
+            <div className="bg-gray-800 border-b border-teal-800 text-center p-3 flex justify-center items-center gap-4 text-sm shadow-lg flex-shrink-0">
                 <ArchiveBoxIcon className="w-6 h-6 text-teal-400 flex-shrink-0" />
                 <p className="text-gray-300">
                     Found an unsaved draft
@@ -265,115 +316,179 @@ const App: React.FC = () => {
                 </button>
             </div>
         )}
-      <div className="p-4 sm:p-6 lg:p-8">
-        <main className="max-w-7xl mx-auto">
-            <header className="text-center mb-8">
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">
+        <main className="max-w-7xl mx-auto w-full flex flex-col flex-grow p-4 min-h-0">
+            <header className="text-center mb-6 flex-shrink-0">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">
                 SRT Lyric Sync
             </h1>
-            <p className="mt-3 max-w-2xl mx-auto text-lg text-gray-400">
+            <p className="mt-2 max-w-2xl mx-auto text-base text-gray-400">
                 Automatically generate synchronized subtitles for your music videos.
             </p>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch flex-grow min-h-0">
             {/* Input Column */}
-            <div className="flex flex-col gap-8">
-                <div className="p-6 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700">
-                <h2 className="text-xl font-semibold mb-4 text-gray-200">
-                    {uploadBoxTitle}
-                </h2>
-                <FileUpload 
-                    videoFile={videoFile} 
-                    setVideoFile={setVideoFile} 
-                    disabled={isLoading || isRefining}
-                    videoUrl={videoUrl}
-                />
+            <div className="flex flex-col gap-6 min-h-0">
+                <div className="p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col min-h-0">
+                  <div className="flex items-baseline mb-4">
+                    <h2 className="text-lg font-semibold text-gray-200 flex-shrink-0">
+                      {uploadBoxTitle}
+                    </h2>
+                    {videoFile && (
+                      <span className="text-sm text-gray-400 truncate ml-4" title={videoFile.name}>
+                          {videoFile.name}
+                      </span>
+                    )}
+                  </div>
+                  <FileUpload 
+                      videoFile={videoFile} 
+                      setVideoFile={setVideoFile} 
+                      disabled={isLoading || isRefining}
+                      videoUrl={videoUrl}
+                  />
                 </div>
 
-                <div className="p-6 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 h-96 flex flex-col">
-                <h2 className="text-xl font-semibold mb-4 text-gray-200">2. Provide Lyrics</h2>
-                <LyricsInput lyrics={lyrics} setLyrics={setLyrics} disabled={isLoading || isRefining} />
+                <div className="p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col flex-grow min-h-0">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-semibold text-gray-200">2. Provide Lyrics</h2>
+                        <button
+                            onClick={handleGenerate}
+                            disabled={!canGenerate}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out
+                                        bg-teal-600 hover:bg-teal-500
+                                        disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed
+                                        focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none"
+                        >
+                            <SparklesIcon className="w-5 h-5" />
+                            {isLoading ? 'Generating...' : 'Generate'}
+                        </button>
+                    </div>
+                    <LyricsInput lyrics={lyrics} setLyrics={setLyrics} disabled={isLoading || isRefining} />
                 </div>
-
-                <button
-                onClick={handleGenerate}
-                disabled={!canGenerate}
-                className="w-full py-4 px-6 text-lg font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out
-                            bg-teal-600 hover:bg-teal-500
-                            disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed
-                            focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none"
-                >
-                {isLoading ? 'Generating...' : (isRefining ? 'Refining...' : 'Generate SRT')}
-                </button>
             </div>
 
             {/* Output Column */}
-            <div className="p-6 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 min-h-[40rem] flex flex-col">
-                <h2 className="text-xl font-semibold mb-4 text-gray-200">3. Get Your Subtitles</h2>
-                
-                {srtEntries.length > 0 && !isLoading && !error && (
-                <div className="mb-4 border-b border-gray-700">
-                    <nav className="-mb-px flex space-x-4" aria-label="Tabs">
-                        <TabButton 
-                            label="Editor"
-                            icon={<EditIcon className="w-5 h-5" />}
-                            isActive={view === 'editor'}
-                            onClick={() => setView('editor')}
-                        />
-                        <TabButton 
-                            label="Preview"
-                            icon={<PlayIcon className="w-5 h-5" />}
-                            isActive={view === 'preview'}
-                            onClick={() => setView('preview')}
-                        />
-                    </nav>
+            <div className="p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col gap-4 min-h-0">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-lg font-semibold text-gray-200">3. Get Your Subtitles</h2>
+                    {srtEntries.length > 0 && !isLoading && !error && (
+                        <nav className="flex space-x-2 p-1 bg-gray-900 rounded-lg" aria-label="Tabs">
+                            <TabButton 
+                                label="Editor"
+                                icon={<EditIcon className="w-5 h-5" />}
+                                isActive={view === 'editor'}
+                                onClick={() => setView('editor')}
+                            />
+                            <TabButton 
+                                label="Preview"
+                                icon={<PlayIcon className="w-5 h-5" />}
+                                isActive={view === 'preview'}
+                                onClick={() => setView('preview')}
+                            />
+                        </nav>
+                    )}
                 </div>
+
+                {/* Controls Bar - only for editor view and when there are entries */}
+                {srtEntries.length > 0 && !isLoading && !error && view === 'editor' && (
+                    <div className="mt-3 pt-3 border-t border-gray-700 flex justify-between items-center flex-wrap gap-2">
+                        {/* Left side: History */}
+                        <div className="flex items-center space-x-2">
+                            <button onClick={undo} disabled={!canUndo || isRefining} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Undo">
+                                <UndoIcon className="w-5 h-5" />
+                            </button>
+                            <button onClick={redo} disabled={!canRedo || isRefining} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Redo">
+                                <RedoIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Right side: Actions */}
+                        <div className="flex items-center space-x-2 flex-wrap justify-end gap-2">
+                            <button onClick={handleAddLine} disabled={isRefining} className="flex items-center px-3 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Add new subtitle line to the end">
+                                <PlusIcon className="w-5 h-5 mr-2" />
+                                Add Line
+                            </button>
+
+                            <button onClick={handleRefineTimings} disabled={isRefining} className="flex items-center px-3 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Use AI to improve timing accuracy">
+                                <SparklesIcon className="w-5 h-5 mr-2" />
+                                Refine
+                            </button>
+                            <button onClick={() => setIsDownloadDialogOpen(true)} disabled={isRefining} className="flex items-center px-3 py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Download subtitle file">
+                                <DownloadIcon className="w-5 h-5 mr-2" />
+                                Download
+                            </button>
+                        </div>
+                    </div>
                 )}
                 
-                <div className="flex-grow bg-gray-900/70 rounded-lg relative">
-                {isLoading && <Loader message="Analyzing audio & syncing lyrics..." />}
-                {!isLoading && error && (
-                    <div className="flex items-center justify-center h-full text-center text-red-400 p-4">
-                    <p>{error}</p>
-                    </div>
-                )}
-                {!isLoading && !error && srtEntries.length > 0 && (
-                    view === 'editor' ? (
-                        <SrtDisplay 
-                        entries={srtEntries}
-                        setEntries={setSrtEntries}
-                        videoFileName={videoFile?.name ?? 'lyrics.srt'}
-                        undo={undo}
-                        redo={redo}
-                        canUndo={canUndo}
-                        canRedo={canRedo}
-                        onRefine={handleRefineTimings}
-                        isRefining={isRefining}
-                        offset={offset}
-                        setOffset={setOffset}
-                        />
-                    ) : (
-                        <VideoPreview 
-                            videoFile={videoFile!} 
-                            videoUrl={videoUrl!} 
-                            entries={srtEntries} 
-                        />
-                    )
-                )}
-                {!isLoading && !error && srtEntries.length === 0 && (
-                    <div className="flex items-center justify-center h-full text-center text-gray-500 p-4">
-                    <p>Your generated SRT file will appear here.</p>
-                    </div>
-                )}
+                {/* Content Area for Column */}
+                <div className="bg-gray-900/70 rounded-lg relative flex flex-col flex-grow min-h-0">
+                    {isLoading && <Loader message={loadingMessage} />}
+                    {!isLoading && error && (
+                        <div className="flex items-center justify-center h-full text-center text-red-400 p-4">
+                        <p>{error}</p>
+                        </div>
+                    )}
+                    {!isLoading && !error && srtEntries.length > 0 && (
+                        view === 'editor' ? (
+                            <>
+                                <div className={`p-3 bg-gray-900/50 border-b border-gray-700 transition-all ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`}>
+                                    <div>
+                                        <label htmlFor="timing-offset-slider" className="block text-sm font-medium text-gray-300 mb-2">Global Timing Offset</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                id="timing-offset-slider"
+                                                type="range"
+                                                min="-5000"
+                                                max="5000"
+                                                step="1"
+                                                value={offset}
+                                                onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10))}
+                                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
+                                                disabled={allControlsDisabled}
+                                                title={`${offset}ms`}
+                                            />
+                                            <input
+                                                type="number"
+                                                value={offset}
+                                                onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10) || 0)}
+                                                className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
+                                                step="1"
+                                                aria-label="Timing offset in milliseconds"
+                                                disabled={allControlsDisabled}
+                                            />
+                                            <button onClick={() => handleOffsetChange(0)} disabled={offset === 0 || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Reset offset">
+                                                <ArrowPathIcon className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <SrtDisplay 
+                                    entries={srtEntries}
+                                    setEntries={setSrtEntries}
+                                    isRefining={isRefining}
+                                />
+                            </>
+                        ) : (
+                            <VideoPreview 
+                                videoFile={videoFile!} 
+                                videoUrl={videoUrl!} 
+                                entries={srtEntries} 
+                            />
+                        )
+                    )}
+                    {!isLoading && !error && srtEntries.length === 0 && (
+                        <div className="flex items-center justify-center h-full text-center text-gray-500 p-4">
+                        <p>Your generated SRT file will appear here.</p>
+                        </div>
+                    )}
                 </div>
             </div>
             </div>
         </main>
-        <footer className="text-center mt-12 text-gray-500 text-sm">
-            <p>Powered by Google Gemini</p>
-        </footer>
-      </div>
+      <footer className="text-center py-4 text-gray-500 text-sm flex-shrink-0">
+          <p>Powered by Google Gemini</p>
+      </footer>
     </div>
   );
 };

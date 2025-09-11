@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface LyricsInputProps {
@@ -10,11 +9,10 @@ interface LyricsInputProps {
 const LyricsInput: React.FC<LyricsInputProps> = ({ lyrics, setLyrics, disabled }) => {
   return (
     <div className="flex flex-col h-full">
-      <label htmlFor="lyrics" className="text-lg font-semibold mb-2 text-gray-300">
-        Paste Lyrics
-      </label>
+      {/* The <label> has been removed to provide more space for the textarea. */}
       <textarea
         id="lyrics"
+        aria-label="Paste Lyrics"
         value={lyrics}
         onChange={(e) => setLyrics(e.target.value)}
         disabled={disabled}

@@ -1,23 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowPathIcon, CopyIcon, DownloadIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon } from './icons';
-import { serializeSrt, SrtEntryData, msToTimestamp, timestampToMs } from '../utils/srtUtils';
+
+
+
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { SrtEntryData } from '../utils/srtUtils';
 import SrtEntry from './SrtEntry';
 import Loader from './Loader';
 import ContextMenu from './ContextMenu';
-import DownloadDialog from './DownloadDialog';
 
 interface SrtDisplayProps {
   entries: SrtEntryData[];
   setEntries: React.Dispatch<React.SetStateAction<SrtEntryData[]>>;
-  videoFileName: string;
-  undo: () => void;
-  redo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  onRefine: () => void;
   isRefining: boolean;
-  offset: number;
-  setOffset: (offset: number) => void;
 }
 
 interface ContextMenuState {
@@ -28,51 +21,44 @@ interface ContextMenuState {
     isLast: boolean;
 }
 
+// Helper hook to track the previous value of a prop or state.
+function usePrevious<T>(value: T) {
+  // FIX: Explicitly initialize useRef with `undefined`. The `useRef<T>()` overload, while valid in recent
+  // @types/react versions, can cause an "Expected 1 arguments, but got 0" error with older setups.
+  // This more explicit form is safer and universally compatible.
+  const ref = useRef<T | undefined>(undefined);
+  useEffect(() => {
+    ref.current = value;
+  }, [value]);
+  return ref.current;
+}
+
+
 const SrtDisplay: React.FC<SrtDisplayProps> = ({ 
     entries, 
     setEntries, 
-    videoFileName, 
-    undo, 
-    redo, 
-    canUndo, 
-    canRedo,
-    onRefine,
     isRefining,
-    offset,
-    setOffset
 }) => {
-  const [copied, setCopied] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-
-  const handleOffsetChange = (newOffsetValue: number) => {
-    const diff = newOffsetValue - offset;
-    if (diff === 0) return;
-
-    setEntries(currentEntries => currentEntries.map(entry => {
-        const newStartTime = timestampToMs(entry.startTime) + diff;
-        const newEndTime = timestampToMs(entry.endTime) + diff;
-        return {
-            ...entry,
-            startTime: msToTimestamp(newStartTime),
-            endTime: msToTimestamp(newEndTime),
-        };
-    }));
-    setOffset(newOffsetValue);
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(serializeSrt(entries));
-    setCopied(true);
-  };
-
-  const handleDownload = () => {
-    setIsDownloadDialogOpen(true);
-  };
   
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const prevEntriesLength = usePrevious(entries.length);
+
+  useEffect(() => {
+      // If a new entry was added (length increased), scroll to the bottom.
+      if (prevEntriesLength !== undefined && entries.length > prevEntriesLength) {
+          const container = scrollContainerRef.current;
+          if (container) {
+              // Using smooth scroll for a better UX
+              container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+          }
+      }
+  }, [entries.length, prevEntriesLength]);
+
   const handleUpdate = (index: number, field: keyof SrtEntryData, value: string | number) => {
     setEntries(currentEntries => {
         const newEntries = [...currentEntries];
@@ -106,20 +92,6 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
         return currentEntries;
       });
   }, [setEntries]);
-
-  const handleAdd = () => {
-    setEntries(currentEntries => {
-        const newIndex = currentEntries.length + 1;
-        const lastEntry = currentEntries[currentEntries.length - 1];
-        const newEntry: SrtEntryData = {
-        index: newIndex,
-        startTime: lastEntry?.endTime || '00:00:00,000',
-        endTime: lastEntry?.endTime || '00:00:00,000',
-        text: 'New subtitle'
-        };
-        return [...currentEntries, newEntry];
-    });
-  };
 
   const handleInsert = useCallback((afterIndex: number) => {
     setEntries(currentEntries => {
@@ -166,13 +138,6 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
         return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
     });
   }, [setEntries]);
-
-  useEffect(() => {
-    if (copied) {
-      const timer = setTimeout(() => setCopied(false), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [copied]);
   
   const handleContextMenu = (e: React.MouseEvent, entry: SrtEntryData, isFirst: boolean, isLast: boolean) => {
       e.preventDefault();
@@ -212,13 +177,7 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
   const allControlsDisabled = isRefining;
 
   return (
-    <div className="bg-gray-800 rounded-lg h-full flex flex-col relative" onClick={contextMenu ? closeContextMenu : undefined}>
-      <DownloadDialog 
-        isOpen={isDownloadDialogOpen}
-        onClose={() => setIsDownloadDialogOpen(false)}
-        entries={entries}
-        videoFileName={videoFileName}
-      />
+    <div className="flex flex-col relative flex-grow min-h-0" onClick={contextMenu ? closeContextMenu : undefined}>
       {isRefining && (
           <div className="absolute inset-0 z-30 rounded-lg">
               <Loader message="Refining timings..." />
@@ -238,64 +197,11 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
               onMove={handleMove}
           />
       )}
-      <div className={`p-3 bg-gray-900/50 rounded-t-lg border-b border-gray-700 sticky top-0 z-10 transition-all ${allControlsDisabled ? 'filter blur-sm' : ''}`}>
-        <div className="flex justify-between items-center">
-            <h3 className="font-semibold text-gray-300">SRT Editor</h3>
-            <div className="flex items-center space-x-2">
-            <button onClick={undo} disabled={!canUndo || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Undo">
-                <UndoIcon className="w-5 h-5" />
-            </button>
-            <button onClick={redo} disabled={!canRedo || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Redo">
-                <RedoIcon className="w-5 h-5" />
-            </button>
-
-            <div className="h-6 w-px bg-gray-700"></div>
-
-            <button onClick={onRefine} disabled={allControlsDisabled} className="flex items-center px-3 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Use AI to improve timing accuracy">
-                <SparklesIcon className="w-5 h-5 mr-2" />
-                Refine
-            </button>
-            <button onClick={handleCopy} disabled={allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Copy to clipboard">
-                {copied ? <span className="text-sm text-teal-400">Copied!</span> : <CopyIcon className="w-5 h-5" />}
-            </button>
-            <button onClick={handleDownload} disabled={allControlsDisabled} className="flex items-center px-3 py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Download subtitle file">
-                <DownloadIcon className="w-5 h-5 mr-2" />
-                Download
-            </button>
-            </div>
-        </div>
-        
-        <div className="mt-3 pt-3 border-t border-gray-700/50">
-            <label htmlFor="timing-offset-slider" className="block text-sm font-medium text-gray-300 mb-2">Global Timing Offset</label>
-            <div className="flex items-center gap-3">
-                <input
-                    id="timing-offset-slider"
-                    type="range"
-                    min="-5000"
-                    max="5000"
-                    step="1"
-                    value={offset}
-                    onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10))}
-                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
-                    disabled={allControlsDisabled}
-                    title={`${offset}ms`}
-                />
-                <input
-                    type="number"
-                    value={offset}
-                    onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10) || 0)}
-                    className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
-                    step="1"
-                    aria-label="Timing offset in milliseconds"
-                    disabled={allControlsDisabled}
-                />
-                <button onClick={() => handleOffsetChange(0)} disabled={offset === 0 || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Reset offset">
-                    <ArrowPathIcon className="w-5 h-5" />
-                </button>
-            </div>
-        </div>
-      </div>
-      <div className={`p-2 overflow-auto flex-grow transition-all ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`}>
+      <div 
+        ref={scrollContainerRef}
+        className={`p-2 transition-all flex-grow min-h-0 overflow-y-auto ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`}
+        onClick={() => setActiveIndex(null)}
+      >
         <div className="space-y-2">
             {entries.map((entry, idx) => (
                 <SrtEntry 
@@ -305,6 +211,12 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
                     isLast={idx === entries.length - 1}
                     onUpdate={handleUpdate}
                     onContextMenu={(e) => handleContextMenu(e, entry, idx === 0, idx === entries.length - 1)}
+                    // Highlight on click
+                    isActive={activeIndex === entry.index}
+                    onClick={(e) => {
+                        e.stopPropagation(); // Prevent container click from deselecting
+                        setActiveIndex(entry.index);
+                    }}
                     // Drag & Drop props
                     index={idx}
                     isDragging={draggedIndex === idx}
@@ -315,16 +227,6 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
                     onDragEnd={handleDragEnd}
                 />
             ))}
-        </div>
-        <div className="mt-4 flex justify-center">
-            <button 
-                onClick={handleAdd}
-                className="flex items-center px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
-                title="Add new subtitle line to the end"
-            >
-                <PlusIcon className="w-5 h-5 mr-2" />
-                Add Line to End
-            </button>
         </div>
       </div>
     </div>

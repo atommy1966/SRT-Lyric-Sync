@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { SrtEntryData } from '../utils/srtUtils';
 import { ArrowDownIcon, ArrowUpIcon, ChevronDoubleDownIcon, PlusIcon, TrashIcon } from './icons';
 
@@ -17,6 +18,27 @@ interface ContextMenuProps {
 
 const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, entry, isFirst, isLast, onClose, onMove, onInsert, onMerge, onDelete }) => {
     const menuRef = useRef<HTMLDivElement>(null);
+    const [position, setPosition] = useState({ top: y, left: x });
+
+    useLayoutEffect(() => {
+        if (menuRef.current) {
+            const { innerHeight } = window;
+            const { offsetHeight } = menuRef.current;
+
+            let finalTop = y;
+            // If the menu would overflow the bottom of the viewport, position it above the cursor.
+            if (y + offsetHeight > innerHeight) {
+                finalTop = y - offsetHeight;
+            }
+
+            // Ensure the menu doesn't go off the top of the screen
+            if (finalTop < 0) {
+                finalTop = 5; // A small margin from the top
+            }
+
+            setPosition({ top: finalTop, left: x });
+        }
+    }, [x, y]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -42,8 +64,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, entry, isFirst, isLast,
 
     const menuStyle: React.CSSProperties = {
         position: 'fixed',
-        top: y,
-        left: x,
+        top: position.top,
+        left: position.left,
         zIndex: 50,
     };
 

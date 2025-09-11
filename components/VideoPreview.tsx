@@ -41,7 +41,7 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ videoFile, videoUrl, entrie
         ref={videoRef}
         controls
         crossOrigin="anonymous"
-        className="w-full h-full max-h-full object-contain rounded-lg"
+        className="w-full h-full max-h-full max-w-full object-contain rounded-lg"
       >
         <source src={videoUrl} type={videoFile.type} />
         {vttUrl && (

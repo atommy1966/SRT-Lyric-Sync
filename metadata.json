@@ -1,5 +1,5 @@
 {
-  "name": "SRT Lyric Sync Ver.1.2",
-  "description": "Upload a audio or video with audio and provide the full lyrics to automatically generate a synchronized SRT,VTT,LRC subtitle file using AI.",
+  "name": "SRT Lyric Sync Ver.1.2.1",
+  "description": "Upload a audio or a video with audio and provide the full lyrics to automatically generate a synchronized SRT,VTT,LRC subtitle file using AI.",
   "requestFramePermissions": []
 }
