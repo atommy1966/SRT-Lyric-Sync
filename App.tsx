@@ -461,13 +461,15 @@ const App: React.FC = () => {
             </div>
         )}
         <main className="max-w-7xl mx-auto w-full flex flex-col flex-grow p-4 min-h-0">
-            <header className="text-center mb-6 flex-shrink-0">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">
-                SRT Lyric Sync
-            </h1>
-            <p className="mt-2 max-w-2xl mx-auto text-base text-gray-400">
-                Automatically generate synchronized subtitles for your music videos.
-            </p>
+            <header className="text-center my-3 flex-shrink-0">
+                <h1 className="text-lg md:text-xl font-semibold tracking-tight text-gray-300 flex flex-wrap justify-center items-center gap-x-2 px-2">
+                    <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">
+                        SRT Lyric Sync
+                    </span>
+                    <span className="text-xs md:text-sm text-gray-400 font-normal">
+                        Automatically generate synchronized subtitles for your music videos.
+                    </span>
+                </h1>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch flex-grow min-h-0">

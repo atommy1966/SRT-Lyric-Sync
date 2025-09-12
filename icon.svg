@@ -1,0 +1,15 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="256" height="256" rx="32" fill="url(#gradient)"/>
+    <defs>
+        <linearGradient id="gradient" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#14B8A6"/>
+            <stop offset="1" stop-color="#06B6D4"/>
+        </linearGradient>
+    </defs>
+    <!-- Music Note -->
+    <path d="M128 72V158.5C128 152.28 124.512 146.96 119.24 144.4C113.968 141.84 107.696 142.44 102.92 145.96C98.144 149.48 95.504 155.4 96.224 161.44C96.944 167.48 100.88 172.56 106.4 174.52C111.92 176.48 117.968 175.08 122.24 171.04C126.512 167 128 161.2 128 155.5M160 56V142.5C160 136.28 156.512 130.96 151.24 128.4C145.968 125.84 139.696 126.44 134.92 129.96C130.144 133.48 127.504 139.4 128.224 145.44C128.944 151.48 132.88 156.56 138.4 158.52C143.92 160.48 149.968 159.08 154.24 155.04C158.512 151 160 145.2 160 139.5" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="128" y1="72" x2="160" y2="56" stroke="white" stroke-width="12" stroke-linecap="round"/>
+    <!-- Sync Arrows -->
+    <path d="M192 104C192 81.9086 174.091 64 152 64C136.83 64 123.593 71.8034 115.635 83.635M115.635 83.635L122 92M115.635 83.635L106.365 80.365" stroke="white" stroke-opacity="0.8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M64 152C64 174.091 81.9086 192 104 192C119.17 192 132.407 184.197 140.365 172.365M140.365 172.365L134 164M140.365 172.365L149.635 175.635" stroke="white" stroke-opacity="0.8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
