@@ -10,6 +10,7 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
     *   **Drag & Drop**: Effortlessly reorder subtitle lines.
     *   **Right-Click Menu**: Quickly insert new lines, merge with the next line, or delete.
     *   **Split On-the-Fly**: Place your cursor in the text and click "Split" to instantly break a long line into two, with timings automatically calculated.
+    *   **Keyboard Shortcuts**: Use arrow keys in time fields for precise 100ms adjustments (or 1-second jumps with Shift). Play/pause the video with the spacebar when not typing.
 *   **Global Timing Controls**:
     *   **Offset Slider**: Shift all timestamps forward or backward at once to perfectly align the entire subtitle track.
     *   **Vocal Decay Helper**: Add a uniform padding to the end of each line to better match the natural fade-out of a singer's voice.
