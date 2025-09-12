@@ -7,10 +7,11 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 *   **AI-Powered Synchronization**: Upload your media file (video or audio) and provide the lyrics to get a perfectly synchronized subtitle file in seconds.
 *   **High-Precision AI Refinement**: Fine-tune the generated timings with a single click, leveraging AI to analyze vocal decay and phrasing for professional-grade accuracy.
 *   **Advanced Interactive Editor**:
+    *   **One-Click Timestamping**: Click the target icon next to any time field to instantly set it to the video's current playback position.
     *   **Drag & Drop**: Effortlessly reorder subtitle lines.
     *   **Right-Click Menu**: Quickly insert new lines, merge with the next line, or delete.
     *   **Split On-the-Fly**: Place your cursor in the text and click "Split" to instantly break a long line into two, with timings automatically calculated.
-    *   **Keyboard Shortcuts**: Use arrow keys in time fields for precise 100ms adjustments (or 1-second jumps with Shift). Play/pause the video with the spacebar when not typing.
+    *   **Timestamp Keyboard Helper**: Use arrow keys in time fields for precise 100ms adjustments (or 1-second jumps with Shift). Play/pause the video with the spacebar when not typing.
 *   **Global Timing Controls**:
     *   **Offset Slider**: Shift all timestamps forward or backward at once to perfectly align the entire subtitle track.
     *   **Vocal Decay Helper**: Add a uniform padding to the end of each line to better match the natural fade-out of a singer's voice.
@@ -31,6 +32,8 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 ## 🌐 Live Demo
 
 [Try SRT Lyric Sync in AI Studio](https://ai.studio/apps/drive/1Ip8QTAlYMcVD3vXfjPqTSroORKYCJLhG)
+
+**Note:** The maximum upload size for media files is 15MB.
 
 ## 💻 Local Development
 
