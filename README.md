@@ -1,5 +1,7 @@
 # SRT Lyric Sync
 
+[Español](./README.es.md) | [日本語](./README.ja.md) | [简体中文](./README.zh-CN.md)
+
 Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyrics to automatically generate a synchronized SRT, VTT, or LRC subtitle file using AI.
 
 ![SRT Lyric Sync - Main Interface](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-12%2014.48.26.png)
@@ -34,7 +36,7 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 
 ## 🌐 Live Demo
 
-[Try SRT Lyric Sync in AI Studio](https://ai.studio/apps/drive/1Ip8QTAlYMcVD3vXfjPqTSroORKYCJLhG)
+[Try SRT Lyric Sync Here]({PASTE YOUR DEPLOYED URL HERE})
 
 **Note:** The maximum upload size for media files is 15MB.
 
