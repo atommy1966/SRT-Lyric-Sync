@@ -24,37 +24,37 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 
 ## 🌐 Live Demo
 
-[Try SRT Lyric Sync in AI Studio](https://aistudio.google.com/app/YOUR_APP_ID_HERE)
-*(Replace `YOUR_APP_ID_HERE` with your actual application link)*
+[Try SRT Lyric Sync in AI Studio](https://ai.studio/apps/drive/1Ip8QTAlYMcVD3vXfjPqTSroORKYCJLhG)
 
 ## 💻 Local Development
 
-To run this application on your local machine, follow these steps.
+This application is designed to get the Gemini API Key from an environment variable (`process.env.API_KEY`), which is automatically handled when deployed in Google AI Studio.
 
-### 1. Set your API Key
-The application needs a Google Gemini API Key to function.
+For **local development only**, you will need to provide the key manually.
 
-- Open the `services/geminiService.ts` file.
-- Find the line `const API_KEY = process.env.API_KEY;`
-- Replace it with your actual key like this: `const API_KEY = "YOUR_GEMINI_API_KEY_HERE";`
+### 1. Set Your API Key (Local Workaround)
+Because this is a simple static project without a build process, you must temporarily edit `services/geminiService.ts` to insert your key.
 
-**Important:** Do not commit this change if you are using a public repository.
+- **Open:** `services/geminiService.ts`
+- **Find the line:** `const API_KEY = process.env.API_KEY;`
+- **Replace it with your key:** `const API_KEY = "YOUR_GEMINI_API_KEY_HERE";`
+
+⚠️ **CRITICAL:** This is for local testing only. **Do not commit this change** or push it to a public repository, as it will expose your API key.
 
 ### 2. Run a Local Server
-This project is a simple static site and doesn't need a complex build process.
-
+This project doesn't need a complex build process.
 - Open a terminal in the project's root directory.
-- If you have Python 3, run the command:
+- Use a simple local server. For example:
   ```bash
+  # If you have Python 3
   python -m http.server
-  ```
-- Alternatively, if you have Node.js, you can use the `serve` package:
-  ```bash
+
+  # If you have Node.js and serve
   npx serve .
   ```
 
 ### 3. Open in Browser
-Navigate to the local URL shown in your terminal (e.g., `http://localhost:8000` or `http://localhost:3000`).
+- Navigate to the local URL shown in your terminal (e.g., `http://localhost:8000`).
 
 ---
 
