@@ -187,6 +187,7 @@ const SrtDisplay: React.FC<SrtDisplayProps> = ({
   }, [setEntries]);
 
   const handleSplit = useCallback((indexToSplit: number, splitAt: number) => {
+    justInsertedInMiddleRef.current = true; // Prevent auto-scroll to bottom
     setEntries(currentEntries => {
         const arrayIndex = currentEntries.findIndex(e => e.index === indexToSplit);
         if (arrayIndex === -1) return currentEntries;
