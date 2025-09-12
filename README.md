@@ -22,4 +22,56 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 
 ---
 
+## 🌐 Live Demo
+
+[Try SRT Lyric Sync live here!](https://aistudio.google.com/app/YOUR_APP_ID_HERE)
+*(Replace `YOUR_APP_ID_HERE` with your actual application link)*
+
+## 💻 Local Development Setup
+
+To run this application on your local machine, follow these steps.
+
+### Prerequisites
+
+*   A modern web browser.
+*   A local web server. You can use a simple one like Python's built-in server or Node's `serve` package.
+*   A Google Gemini API Key. You can get one from [Google AI Studio](https://aistudio.google.com/app/apikey).
+
+### Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+    cd YOUR_REPO_NAME
+    ```
+    *(Replace `YOUR_USERNAME/YOUR_REPO_NAME` with your actual repository path)*
+
+2.  **Set up your API Key:**
+    The application code expects the Gemini API key to be available as `process.env.API_KEY`. When running locally without a build tool, you need to provide this key manually. The simplest way for local testing is:
+    
+    *   Open the `services/geminiService.ts` file.
+    *   Find the line `const API_KEY = process.env.API_KEY;`
+    *   Replace it with your actual key: `const API_KEY = "YOUR_GEMINI_API_KEY_HERE";`
+    
+    **Important:** Do not commit your API key to your Git repository.
+
+### Running the App
+
+1.  **Start a local server:**
+    From the project's root directory, start a simple web server.
+    
+    If you have Python 3 installed:
+    ```bash
+    python -m http.server
+    ```
+    If you have Node.js installed, you can use the `serve` package:
+    ```bash
+    npx serve .
+    ```
+
+2.  **Open in browser:**
+    Open your web browser and navigate to the URL provided by your local server (e.g., `http://localhost:8000` or `http://localhost:3000`).
+
+---
+
 Powered by Google Gemini.
