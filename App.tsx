@@ -303,11 +303,26 @@ const App: React.FC = () => {
     const diff = newPadding - endTimePadding;
     if (diff === 0) return;
 
-    setSrtEntries(currentEntries => currentEntries.map(entry => {
-        const newEndTime = timestampToMs(entry.endTime) + diff;
+    setSrtEntries(currentEntries => currentEntries.map((entry, index) => {
+        const startTimeMs = timestampToMs(entry.startTime);
+        let newEndTimeMs = timestampToMs(entry.endTime) + diff;
+
+        // Ensure end time doesn't precede start time.
+        newEndTimeMs = Math.max(startTimeMs, newEndTimeMs);
+
+        // If padding is being added, prevent overlap with the next subtitle.
+        const isIncreasingPadding = diff > 0;
+        const hasNextEntry = index < currentEntries.length - 1;
+
+        if (isIncreasingPadding && hasNextEntry) {
+          const nextEntryStartTimeMs = timestampToMs(currentEntries[index + 1].startTime);
+          // Cap the end time at the start of the next entry.
+          newEndTimeMs = Math.min(newEndTimeMs, nextEntryStartTimeMs);
+        }
+
         return {
             ...entry,
-            endTime: msToTimestamp(newEndTime),
+            endTime: msToTimestamp(newEndTimeMs),
         };
     }));
     setEndTimePadding(newPadding);
