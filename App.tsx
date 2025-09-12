@@ -7,10 +7,9 @@ import FileUpload from './components/FileUpload';
 import LyricsInput from './components/LyricsInput';
 import SrtDisplay from './components/SrtDisplay';
 import Loader from './components/Loader';
-import { SrtEntryData, msToTimestamp, timestampToMs, parseSrt, parseVtt, parseLrc } from './utils/srtUtils';
-import { ArchiveBoxIcon, ArrowPathIcon, DownloadIcon, EditIcon, PlayIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon } from './components/icons';
+import { SrtEntryData, msToTimestamp, timestampToMs, parseSrt, parseVtt, parseLrc, serializeSrt, srtToVtt, serializeLrc } from './utils/srtUtils';
+import { ArchiveBoxIcon, ArrowPathIcon, ChevronDownIcon, DownloadIcon, EditIcon, PlayIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon } from './components/icons';
 import VideoPreview from './components/VideoPreview';
-import DownloadDialog from './components/DownloadDialog';
 
 // Custom hook to manage state with undo/redo functionality
 const useHistoryState = <T,>(initialState: T) => {
@@ -90,11 +89,12 @@ const App: React.FC = () => {
   const [isRefining, setIsRefining] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [draftToRestore, setDraftToRestore] = useState<SavedDraft | null>(null);
-  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
+  const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
 
 
   // Load draft from localStorage on initial mount
@@ -194,6 +194,19 @@ const App: React.FC = () => {
     };
   }, [isLoading, isRefining]);
 
+   // Close download menu on outside click
+   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (downloadMenuRef.current && !downloadMenuRef.current.contains(event.target as Node)) {
+            setIsDownloadMenuOpen(false);
+        }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [downloadMenuRef]);
+
   const handleFileSelect = (file: File | null) => {
     // If null, it's a removal, just proceed
     if (!file) {
@@ -260,6 +273,9 @@ const App: React.FC = () => {
         const videoBase64 = await fileToBase64(videoFile);
         const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, srtEntries);
         setSrtEntries(refinedSrtData);
+        // Reset sliders after successful refinement
+        setOffset(0);
+        setEndTimePadding(0);
     } catch (e) {
         console.error(e);
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
@@ -331,15 +347,65 @@ const App: React.FC = () => {
   const handleSetTimeToCurrent = (entryIndex: number, field: 'startTime' | 'endTime') => {
     if (!videoRef.current) return;
     const currentTimeMs = videoRef.current.currentTime * 1000;
-    const newTimestamp = msToTimestamp(currentTimeMs);
     
-    setSrtEntries(currentEntries =>
-        currentEntries.map(entry =>
-            entry.index === entryIndex
-                ? { ...entry, [field]: newTimestamp }
-                : entry
-        )
-    );
+    setSrtEntries(currentEntries => {
+        const entryArrayIndex = currentEntries.findIndex(e => e.index === entryIndex);
+        if (entryArrayIndex === -1) {
+            return currentEntries;
+        }
+
+        const newEntries = [...currentEntries]; // Create a mutable copy
+        const entryToUpdate = newEntries[entryArrayIndex];
+
+        if (field === 'startTime') {
+            const durationMs = Math.max(0, timestampToMs(entryToUpdate.endTime) - timestampToMs(entryToUpdate.startTime));
+            let newStartTimeMs = currentTimeMs;
+
+            // Constraint 1: Prevent overlap with the previous entry.
+            if (entryArrayIndex > 0) {
+                const prevEntryEndTimeMs = timestampToMs(newEntries[entryArrayIndex - 1].endTime);
+                newStartTimeMs = Math.max(newStartTimeMs, prevEntryEndTimeMs);
+            }
+
+            let newEndTimeMs = newStartTimeMs + durationMs;
+
+            // Constraint 2: Prevent overlap with the next entry. Shorten duration if necessary.
+            if (entryArrayIndex < newEntries.length - 1) {
+                const nextEntryStartTimeMs = timestampToMs(newEntries[entryArrayIndex + 1].startTime);
+                newEndTimeMs = Math.min(newEndTimeMs, nextEntryStartTimeMs);
+                // Ensure start time is not after the (potentially capped) end time.
+                if (newStartTimeMs > newEndTimeMs) {
+                    newStartTimeMs = newEndTimeMs;
+                }
+            }
+            
+            newEntries[entryArrayIndex] = {
+                ...entryToUpdate,
+                startTime: msToTimestamp(newStartTimeMs),
+                endTime: msToTimestamp(newEndTimeMs),
+            };
+
+        } else { // field === 'endTime'
+            let newEndTimeMs = currentTimeMs;
+
+            // Constraint 1: End time must not be before start time.
+            const currentStartTimeMs = timestampToMs(entryToUpdate.startTime);
+            newEndTimeMs = Math.max(newEndTimeMs, currentStartTimeMs);
+
+            // Constraint 2: Prevent overlap with the next entry.
+            if (entryArrayIndex < newEntries.length - 1) {
+                const nextEntryStartTimeMs = timestampToMs(newEntries[entryArrayIndex + 1].startTime);
+                newEndTimeMs = Math.min(newEndTimeMs, nextEntryStartTimeMs);
+            }
+
+            newEntries[entryArrayIndex] = {
+                ...entryToUpdate,
+                endTime: msToTimestamp(newEndTimeMs),
+            };
+        }
+
+        return newEntries; // Return the modified array
+    });
   };
 
   const handleEntryClick = (entry: SrtEntryData) => {
@@ -419,6 +485,46 @@ const App: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const downloadFile = (content: string, fileName: string, mimeType: string) => {
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + content], { type: `${mimeType};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownload = (format: 'srt' | 'vtt' | 'lrc') => {
+    const getBaseName = () => videoFile?.name.substring(0, videoFile.name.lastIndexOf('.')) || 'lyrics';
+    const baseName = getBaseName();
+    let content = '';
+    let fileName = '';
+    let mimeType = 'text/plain';
+
+    switch (format) {
+      case 'srt':
+        content = serializeSrt(srtEntries);
+        fileName = `${baseName}.srt`;
+        break;
+      case 'vtt':
+        content = srtToVtt(serializeSrt(srtEntries));
+        fileName = `${baseName}.vtt`;
+        mimeType = 'text/vtt';
+        break;
+      case 'lrc':
+        content = serializeLrc(srtEntries);
+        fileName = `${baseName}.lrc`;
+        break;
+    }
+    
+    downloadFile(content, fileName, mimeType);
+    setIsDownloadMenuOpen(false);
+  };
+
 
   const canGenerate = videoFile !== null && lyrics.trim().length > 0 && !isLoading && !isRefining;
 
@@ -432,12 +538,6 @@ const App: React.FC = () => {
 
   return (
     <div className={containerClasses}>
-        <DownloadDialog 
-            isOpen={isDownloadDialogOpen}
-            onClose={() => setIsDownloadDialogOpen(false)}
-            entries={srtEntries}
-            videoFileName={videoFile?.name ?? 'lyrics.srt'}
-        />
         {draftToRestore && (
             <div className="bg-gray-800 border-b border-teal-800 text-center p-3 flex justify-center items-center gap-4 text-sm shadow-lg flex-shrink-0">
                 <ArchiveBoxIcon className="w-6 h-6 text-teal-400 flex-shrink-0" />
@@ -568,10 +668,24 @@ const App: React.FC = () => {
                                         <SparklesIcon className="w-5 h-5 sm:mr-2" />
                                         <span className="hidden sm:inline">Refine</span>
                                     </button>
-                                    <button onClick={() => setIsDownloadDialogOpen(true)} disabled={allControlsDisabled} className="flex items-center p-2 sm:px-3 sm:py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Download subtitle file">
-                                        <DownloadIcon className="w-5 h-5 sm:mr-2" />
-                                        <span className="hidden sm:inline">Download</span>
-                                    </button>
+                                    
+                                    {/* Download Split Button */}
+                                    <div className="relative inline-flex shadow-md" ref={downloadMenuRef}>
+                                        <button onClick={() => handleDownload('srt')} disabled={allControlsDisabled} className="flex items-center p-2 sm:px-3 sm:py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-l-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Download SRT file">
+                                            <DownloadIcon className="w-5 h-5 sm:mr-2" />
+                                            <span className="hidden sm:inline">Download SRT</span>
+                                        </button>
+                                        <button onClick={() => setIsDownloadMenuOpen(prev => !prev)} disabled={allControlsDisabled} className="p-2 sm:px-1.5 bg-teal-600 hover:bg-teal-500 rounded-r-md border-l border-teal-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="More download options">
+                                            <ChevronDownIcon className="w-5 h-5" />
+                                        </button>
+
+                                        {isDownloadMenuOpen && (
+                                            <div className="absolute right-0 bottom-full mb-2 w-40 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600 overflow-hidden">
+                                                <a onClick={() => handleDownload('vtt')} className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer">Download VTT</a>
+                                                <a onClick={() => handleDownload('lrc')} className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer">Download LRC</a>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             {/* Timing Controls */}
@@ -594,6 +708,8 @@ const App: React.FC = () => {
                                         />
                                         <input
                                             type="number"
+                                            min="-5000"
+                                            max="5000"
                                             value={offset}
                                             onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10) || 0)}
                                             className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
@@ -615,14 +731,14 @@ const App: React.FC = () => {
                                         <input
                                             id="end-time-padding-slider"
                                             type="range"
-                                            min="0"
-                                            max="2000"
+                                            min="-5000"
+                                            max="5000"
                                             step="10"
                                             value={endTimePadding}
                                             onChange={(e) => handleEndTimePaddingChange(parseInt(e.target.value, 10))}
                                             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
                                             disabled={allControlsDisabled}
-                                            title={`+${endTimePadding}ms`}
+                                            title={`${endTimePadding >= 0 ? '+' : ''}${endTimePadding}ms`}
                                         />
                                         <input
                                             type="number"
@@ -630,7 +746,8 @@ const App: React.FC = () => {
                                             onChange={(e) => handleEndTimePaddingChange(parseInt(e.target.value, 10) || 0)}
                                             className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
                                             step="10"
-                                            min="0"
+                                            min="-5000"
+                                            max="5000"
                                             aria-label="End time padding in milliseconds"
                                             disabled={allControlsDisabled}
                                         />

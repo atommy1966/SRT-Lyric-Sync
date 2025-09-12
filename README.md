@@ -4,12 +4,17 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 
 ## ✨ Features
 
-*   **Automatic Synchronization**: Upload your media file (video or audio) and provide the lyrics to get a perfectly synchronized subtitle file.
-*   **Multiple Format Support**: Import lyrics from `.srt`, `.vtt`, and `.lrc` files, or simply paste the raw text.
-*   **AI-Powered Refinement**: Fine-tune the generated timings with a single click for professional-grade accuracy.
-*   **Interactive Editor**: Easily edit timestamps and text, add/remove lines, merge, split, and reorder subtitles with a user-friendly interface.
-*   **Real-time Preview**: See your subtitles in action with the integrated video/audio player.
-*   **Flexible Export Options**: Download your final work as `.srt`, `.vtt`, or `.lrc` files.
+*   **AI-Powered Synchronization**: Upload your media file (video or audio) and provide the lyrics to get a perfectly synchronized subtitle file in seconds.
+*   **High-Precision AI Refinement**: Fine-tune the generated timings with a single click, leveraging AI to analyze vocal decay and phrasing for professional-grade accuracy.
+*   **Advanced Interactive Editor**:
+    *   **Drag & Drop**: Effortlessly reorder subtitle lines.
+    *   **Right-Click Menu**: Quickly insert new lines, merge with the next line, or delete.
+    *   **Split On-the-Fly**: Place your cursor in the text and click "Split" to instantly break a long line into two, with timings automatically calculated.
+*   **Global Timing Controls**:
+    *   **Offset Slider**: Shift all timestamps forward or backward at once to perfectly align the entire subtitle track.
+    *   **Vocal Decay Helper**: Add a uniform padding to the end of each line to better match the natural fade-out of a singer's voice.
+*   **Real-time Video Preview**: See your edits reflected instantly on the custom video player. The subtitle list automatically scrolls to the currently playing line.
+*   **Flexible I/O**: Import lyrics from `.srt`, `.vtt`, and `.lrc` files, or paste raw text. Export your work to any of these formats with the streamlined download menu.
 *   **Draft Autosave**: Your progress is automatically saved in your browser, so you can pick up where you left off.
 
 ## 🚀 How to Use
