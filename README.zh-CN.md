@@ -36,7 +36,7 @@
 
 ## 🌐 在线演示
 
-[在此处试用 SRT Lyric Sync]({PASTE YOUR DEPLOYED URL HERE})
+[在此处试用 SRT Lyric Sync](https://srt-lyric-sync-ver-1-3-3-369376059789.us-west1.run.app/)
 
 **注意：** 媒体文件的最大上传大小为 15MB。
 
