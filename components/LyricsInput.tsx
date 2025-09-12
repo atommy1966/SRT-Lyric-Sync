@@ -1,5 +1,6 @@
+
 import React, { useRef } from 'react';
-import { UploadIcon } from './icons';
+import { UploadIcon, XIcon } from './icons';
 
 interface LyricsInputProps {
   lyrics: string;
@@ -51,15 +52,27 @@ const LyricsInput: React.FC<LyricsInputProps> = ({ lyrics, setLyrics, disabled, 
             <div className="flex-grow border-t border-gray-600"></div>
         </div>
 
-      <textarea
-        id="lyrics"
-        aria-label="Paste Lyrics"
-        value={lyrics}
-        onChange={(e) => setLyrics(e.target.value)}
-        disabled={disabled}
-        placeholder="Paste the full song lyrics here..."
-        className="w-full flex-grow p-4 bg-gray-800 border border-gray-600 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      />
+      <div className="relative flex-grow">
+        <textarea
+          id="lyrics"
+          aria-label="Paste Lyrics"
+          value={lyrics}
+          onChange={(e) => setLyrics(e.target.value)}
+          disabled={disabled}
+          placeholder="Paste the full song lyrics here..."
+          className="w-full h-full p-4 pr-10 bg-gray-800 border border-gray-600 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+        {lyrics.length > 0 && !disabled && (
+            <button
+                onClick={() => setLyrics('')}
+                className="absolute top-2.5 right-2.5 p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors"
+                aria-label="Clear lyrics"
+                title="Clear lyrics"
+            >
+                <XIcon className="w-5 h-5" />
+            </button>
+        )}
+      </div>
     </div>
   );
 };

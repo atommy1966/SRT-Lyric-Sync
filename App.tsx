@@ -8,7 +8,7 @@ import LyricsInput from './components/LyricsInput';
 import SrtDisplay from './components/SrtDisplay';
 import Loader from './components/Loader';
 import { SrtEntryData, msToTimestamp, timestampToMs, parseSrt, parseVtt, parseLrc, serializeSrt, srtToVtt, serializeLrc } from './utils/srtUtils';
-import { ArchiveBoxIcon, ArrowPathIcon, ChevronDownIcon, DownloadIcon, EditIcon, PlayIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon } from './components/icons';
+import { ArchiveBoxIcon, ArrowPathIcon, ChevronDownIcon, DownloadIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon } from './components/icons';
 import VideoPreview from './components/VideoPreview';
 
 // Custom hook to manage state with undo/redo functionality
