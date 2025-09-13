@@ -5,7 +5,7 @@
 音声付きの動画または音声ファイルをアップロードし、SRT、VTT、LRC形式の歌詞ファイル、あるいは歌詞全文を提供することで、AIが自動的に同期されたSRT、VTT、LRC形式の字幕ファイルを生成します。
 
 ![SRT Lyric Sync - Main Interface](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-12%2014.48.26.png)
-![SRT Lyric Sync - Editor View](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-12%2014.50.11.png)
+![SRT Lyric Sync - Editor View](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-13%2021.17.22.png)
 
 ## ✨ 主な機能
 
