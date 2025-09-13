@@ -36,7 +36,7 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 
 ## 🌐 Live Demo
 
-[Try SRT Lyric Sync Here](https://srt-lyric-sync-ver-1-3-3-369376059789.us-west1.run.app/)
+[Try SRT Lyric Sync Here](https://srt-lyric-sync-369376059789.us-west1.run.app/)
 
 **Note:** The maximum upload size for media files is 15MB.
 
