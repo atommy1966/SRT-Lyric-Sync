@@ -92,6 +92,8 @@ const App: React.FC = () => {
   const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [importedFileName, setImportedFileName] = useState<string | null>(null);
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
@@ -234,6 +236,7 @@ const App: React.FC = () => {
     resetSrtEntries([]);
     setOffset(0);
     setEndTimePadding(0);
+    setImportedFileName(null);
     // The old draft will be overwritten by the auto-save effect upon successful generation.
 
     try {
@@ -284,20 +287,6 @@ const App: React.FC = () => {
         setIsRefining(false);
     }
   }, [videoFile, srtEntries, setSrtEntries]);
-
-  const handleAddLine = () => {
-    setSrtEntries(currentEntries => {
-        const newIndex = currentEntries.length + 1;
-        const lastEntry = currentEntries[currentEntries.length - 1];
-        const newEntry: SrtEntryData = {
-        index: newIndex,
-        startTime: lastEntry?.endTime || '00:00:00,000',
-        endTime: lastEntry?.endTime || '00:00:00,000',
-        text: 'New subtitle'
-        };
-        return [...currentEntries, newEntry];
-    });
-  };
 
   const handleOffsetChange = (newOffsetValue: number) => {
     const diff = newOffsetValue - offset;
@@ -422,6 +411,7 @@ const App: React.FC = () => {
         resetSrtEntries(draftToRestore.entries);
         setOffset(draftToRestore.offset || 0);
         setEndTimePadding(draftToRestore.endTimePadding || 0);
+        setImportedFileName(null);
         setError("Draft restored. Please re-upload the original media file to use the preview and refine functions.");
         // Clear the info message after a few seconds
         setTimeout(() => setError(null), 6000);
@@ -472,15 +462,18 @@ const App: React.FC = () => {
             resetSrtEntries(parsedEntries);
             setOffset(0);
             setEndTimePadding(0);
+            setImportedFileName(file.name);
 
         } catch (err) {
             console.error('Error parsing subtitle file:', err);
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
             setError(`Failed to parse file: ${errorMessage}`);
+            setImportedFileName(null);
         }
     };
     reader.onerror = () => {
         setError('Error reading the file.');
+        setImportedFileName(null);
     };
     reader.readAsText(file);
   };
@@ -499,7 +492,7 @@ const App: React.FC = () => {
   };
 
   const handleDownload = (format: 'srt' | 'vtt' | 'lrc') => {
-    const getBaseName = () => videoFile?.name.substring(0, videoFile.name.lastIndexOf('.')) || 'lyrics';
+    const getBaseName = () => videoFile?.name.substring(0, videoFile.name.lastIndexOf('.')) || importedFileName?.substring(0, importedFileName.lastIndexOf('.')) ||'lyrics';
     const baseName = getBaseName();
     let content = '';
     let fileName = '';
@@ -622,8 +615,50 @@ const App: React.FC = () => {
 
             {/* Output Column (3/5 width on large screens) */}
             <div className="lg:col-span-3 p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col gap-4 min-h-0 h-screen lg:h-auto">
-                <h2 className="text-lg font-semibold text-gray-200">3. Edit Your Subtitles</h2>
-                
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                    <div className="flex items-baseline min-w-0">
+                        <h2 className="text-lg font-semibold text-gray-200 flex-shrink-0">3. Edit Your Subtitles</h2>
+                        {importedFileName && (
+                            <span className="text-sm text-gray-400 truncate ml-4" title={importedFileName}>
+                                {importedFileName}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        {/* History */}
+                        <div className="flex items-center" role="group">
+                            <button onClick={undo} disabled={!canUndo || allControlsDisabled} className="p-2 rounded-l-md bg-gray-700 hover:bg-gray-600 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Undo">
+                                <UndoIcon className="w-5 h-5" />
+                            </button>
+                            <button onClick={redo} disabled={!canRedo || allControlsDisabled} className="p-2 rounded-r-md bg-gray-700 hover:bg-gray-600 border-l border-gray-800 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Redo">
+                                <RedoIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        {/* Refine */}
+                        <button onClick={handleRefineTimings} disabled={allControlsDisabled} className="flex items-center p-2 sm:px-3 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Use AI to improve timing accuracy">
+                            <SparklesIcon className="w-5 h-5 sm:mr-2" />
+                            <span className="hidden sm:inline">Refine</span>
+                        </button>
+                        {/* Download Split Button */}
+                        <div className="relative inline-flex shadow-md" ref={downloadMenuRef}>
+                            <button onClick={() => handleDownload('srt')} disabled={srtEntries.length === 0 || allControlsDisabled} className="flex items-center p-2 sm:px-3 sm:py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-l-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Download SRT file">
+                                <DownloadIcon className="w-5 h-5 sm:mr-2" />
+                                <span className="hidden sm:inline">Download SRT</span>
+                            </button>
+                            <button onClick={() => setIsDownloadMenuOpen(prev => !prev)} disabled={srtEntries.length === 0 || allControlsDisabled} className="p-2 sm:px-1.5 bg-teal-600 hover:bg-teal-500 rounded-r-md border-l border-teal-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="More download options">
+                                <ChevronDownIcon className="w-5 h-5" />
+                            </button>
+
+                            {isDownloadMenuOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-40 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600 overflow-hidden">
+                                    <a onClick={() => handleDownload('vtt')} className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer">Download VTT</a>
+                                    <a onClick={() => handleDownload('lrc')} className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer">Download LRC</a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {/* Content Area for Column */}
                 <div className="bg-gray-900/70 rounded-lg relative flex flex-col flex-grow min-h-0">
                     {isLoading && <Loader message={loadingMessage} />}
@@ -645,115 +680,71 @@ const App: React.FC = () => {
                                     onTimeUpdate={setCurrentTime}
                                 />
                             </div>
-                            {/* Controls Bar */}
-                             <div className="p-3 border-b border-gray-700 flex justify-between items-center flex-wrap gap-2 flex-shrink-0">
-                                {/* Left side: History */}
-                                <div className="flex items-center space-x-2">
-                                    <button onClick={undo} disabled={!canUndo || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Undo">
-                                        <UndoIcon className="w-5 h-5" />
-                                    </button>
-                                    <button onClick={redo} disabled={!canRedo || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Redo">
-                                        <RedoIcon className="w-5 h-5" />
-                                    </button>
-                                </div>
-
-                                {/* Right side: Actions */}
-                                <div className="flex items-center space-x-2 flex-wrap justify-end gap-2">
-                                    <button onClick={handleAddLine} disabled={allControlsDisabled} className="flex items-center p-2 sm:px-3 sm:py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Add new subtitle line to the end">
-                                        <PlusIcon className="w-5 h-5 sm:mr-2" />
-                                        <span className="hidden sm:inline">Add Line</span>
-                                    </button>
-
-                                    <button onClick={handleRefineTimings} disabled={allControlsDisabled} className="flex items-center p-2 sm:px-3 sm:py-2 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Use AI to improve timing accuracy">
-                                        <SparklesIcon className="w-5 h-5 sm:mr-2" />
-                                        <span className="hidden sm:inline">Refine</span>
-                                    </button>
-                                    
-                                    {/* Download Split Button */}
-                                    <div className="relative inline-flex shadow-md" ref={downloadMenuRef}>
-                                        <button onClick={() => handleDownload('srt')} disabled={allControlsDisabled} className="flex items-center p-2 sm:px-3 sm:py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-l-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="Download SRT file">
-                                            <DownloadIcon className="w-5 h-5 sm:mr-2" />
-                                            <span className="hidden sm:inline">Download SRT</span>
-                                        </button>
-                                        <button onClick={() => setIsDownloadMenuOpen(prev => !prev)} disabled={allControlsDisabled} className="p-2 sm:px-1.5 bg-teal-600 hover:bg-teal-500 rounded-r-md border-l border-teal-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title="More download options">
-                                            <ChevronDownIcon className="w-5 h-5" />
-                                        </button>
-
-                                        {isDownloadMenuOpen && (
-                                            <div className="absolute right-0 bottom-full mb-2 w-40 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600 overflow-hidden">
-                                                <a onClick={() => handleDownload('vtt')} className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer">Download VTT</a>
-                                                <a onClick={() => handleDownload('lrc')} className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer">Download LRC</a>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
+                            
                             {/* Timing Controls */}
-                             <div className={`p-3 bg-gray-900/50 border-b border-gray-700 transition-all space-y-4 flex-shrink-0 ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`}>
-                                {/* Global Offset */}
-                                <div>
-                                    <label htmlFor="timing-offset-slider" className="block text-sm font-medium text-gray-300 mb-2">Global Timing Offset</label>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            id="timing-offset-slider"
-                                            type="range"
-                                            min="-5000"
-                                            max="5000"
-                                            step="10"
-                                            value={offset}
-                                            onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10))}
-                                            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
-                                            disabled={allControlsDisabled}
-                                            title={`${offset}ms`}
-                                        />
-                                        <input
-                                            type="number"
-                                            min="-5000"
-                                            max="5000"
-                                            value={offset}
-                                            onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10) || 0)}
-                                            className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
-                                            step="10"
-                                            aria-label="Timing offset in milliseconds"
-                                            disabled={allControlsDisabled}
-                                        />
-                                        <button onClick={() => handleOffsetChange(0)} disabled={offset === 0 || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Reset offset">
-                                            <ArrowPathIcon className="w-5 h-5" />
-                                        </button>
+                             <div className={`p-3 bg-gray-900/50 border-b border-gray-700 transition-all flex-shrink-0 ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`}>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                                     {/* Global Offset */}
+                                    <div className="flex-1 min-w-[280px]">
+                                        <label htmlFor="timing-offset-slider" className="block text-sm font-medium text-gray-300 mb-2">Global Timing Offset</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                id="timing-offset-slider"
+                                                type="range"
+                                                min="-2000"
+                                                max="2000"
+                                                step="10"
+                                                value={offset}
+                                                onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10))}
+                                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
+                                                disabled={allControlsDisabled}
+                                                title={`${offset}ms`}
+                                            />
+                                            <input
+                                                type="number"
+                                                value={offset}
+                                                onChange={(e) => handleOffsetChange(parseInt(e.target.value, 10) || 0)}
+                                                className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
+                                                step="10"
+                                                aria-label="Timing offset in milliseconds"
+                                                disabled={allControlsDisabled}
+                                            />
+                                            <button onClick={() => handleOffsetChange(0)} disabled={offset === 0 || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Reset offset">
+                                                <ArrowPathIcon className="w-5 h-5" />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                                {/* End Time Padding */}
-                                <div>
-                                    <label htmlFor="end-time-padding-slider" className="block text-sm font-medium text-gray-300 mb-2" title="Adds a small delay to the end of each subtitle to account for vocal decay.">
-                                      Vocal Decay Helper (End Time Padding)
-                                    </label>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            id="end-time-padding-slider"
-                                            type="range"
-                                            min="-5000"
-                                            max="5000"
-                                            step="10"
-                                            value={endTimePadding}
-                                            onChange={(e) => handleEndTimePaddingChange(parseInt(e.target.value, 10))}
-                                            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
-                                            disabled={allControlsDisabled}
-                                            title={`${endTimePadding >= 0 ? '+' : ''}${endTimePadding}ms`}
-                                        />
-                                        <input
-                                            type="number"
-                                            value={endTimePadding}
-                                            onChange={(e) => handleEndTimePaddingChange(parseInt(e.target.value, 10) || 0)}
-                                            className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
-                                            step="10"
-                                            min="-5000"
-                                            max="5000"
-                                            aria-label="End time padding in milliseconds"
-                                            disabled={allControlsDisabled}
-                                        />
-                                        <button onClick={() => handleEndTimePaddingChange(0)} disabled={endTimePadding === 0 || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Reset padding">
-                                            <ArrowPathIcon className="w-5 h-5" />
-                                        </button>
+                                    {/* End Time Padding */}
+                                    <div className="flex-1 min-w-[280px]">
+                                        <label htmlFor="end-time-padding-slider" className="block text-sm font-medium text-gray-300 mb-2" title="Adds a small delay to the end of each subtitle to account for vocal decay.">
+                                          Vocal Decay Helper (End Time Padding)
+                                        </label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                id="end-time-padding-slider"
+                                                type="range"
+                                                min="-2000"
+                                                max="2000"
+                                                step="10"
+                                                value={endTimePadding}
+                                                onChange={(e) => handleEndTimePaddingChange(parseInt(e.target.value, 10))}
+                                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
+                                                disabled={allControlsDisabled}
+                                                title={`${endTimePadding >= 0 ? '+' : ''}${endTimePadding}ms`}
+                                            />
+                                            <input
+                                                type="number"
+                                                value={endTimePadding}
+                                                onChange={(e) => handleEndTimePaddingChange(parseInt(e.target.value, 10) || 0)}
+                                                className="w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50"
+                                                step="10"
+                                                aria-label="End time padding in milliseconds"
+                                                disabled={allControlsDisabled}
+                                            />
+                                            <button onClick={() => handleEndTimePaddingChange(0)} disabled={endTimePadding === 0 || allControlsDisabled} className="p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed" title="Reset padding">
+                                                <ArrowPathIcon className="w-5 h-5" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
