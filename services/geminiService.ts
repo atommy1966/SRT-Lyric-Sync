@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { SrtEntryData, normalizeTimestamp } from "../utils/srtUtils";
 
@@ -231,3 +232,41 @@ ${JSON.stringify(currentEntries, null, 2)}
         throw new Error("An unknown error occurred while refining timings.");
     }
 };
+
+export const transcribeAudio = async (
+    videoBase64: string,
+    mimeType: string
+  ): Promise<string> => {
+    try {
+      const audioPart = {
+        inlineData: {
+          data: videoBase64,
+          mimeType: mimeType,
+        },
+      };
+  
+      const prompt = `
+You are an expert audio transcription service.
+Your task is to transcribe the audio from the provided media file accurately.
+Please format the output with appropriate line breaks to ensure readability.
+- If the content sounds like song lyrics, format each sung line on a new line.
+- If the content is spoken word (like a speech or dialogue), break the text into paragraphs or sentences at natural pauses.
+Your final output should be only the transcribed text. Do not add any titles, headers, or other formatting.
+`;
+  
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts: [audioPart, { text: prompt }] },
+      });
+      
+      // The response is expected to be plain text.
+      return response.text.trim();
+  
+    } catch (error) {
+      console.error("Error transcribing audio:", error);
+      if (error instanceof Error) {
+          throw new Error(`Failed to transcribe audio. Details: ${error.message}`);
+      }
+      throw new Error("An unknown error occurred while transcribing audio.");
+    }
+  };

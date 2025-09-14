@@ -2,13 +2,13 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { fileToBase64 } from './utils/fileUtils';
-import { generateSrtFromVideoAndLyrics, refineSrtTimings } from './services/geminiService';
+import { generateSrtFromVideoAndLyrics, refineSrtTimings, transcribeAudio } from './services/geminiService';
 import FileUpload from './components/FileUpload';
 import LyricsInput from './components/LyricsInput';
 import SrtDisplay from './components/SrtDisplay';
 import Loader from './components/Loader';
 import { SrtEntryData, msToTimestamp, timestampToMs, parseSrt, parseVtt, parseLrc, serializeSrt, srtToVtt, serializeLrc } from './utils/srtUtils';
-import { ArchiveBoxIcon, ArrowPathIcon, ChevronDownIcon, DownloadIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon } from './components/icons';
+import { ArchiveBoxIcon, ArrowPathIcon, ChevronDownIcon, DownloadIcon, MicrophoneIcon, PlusIcon, RedoIcon, SparklesIcon, UndoIcon, UploadIcon } from './components/icons';
 import VideoPreview from './components/VideoPreview';
 
 // Custom hook to manage state with undo/redo functionality
@@ -41,7 +41,7 @@ const useHistoryState = <T,>(initialState: T) => {
 
     const redo = useCallback(() => {
         if (currentIndex < history.length - 1) {
-            setCurrentIndex(currentIndex + 1);
+            setCurrentIndex(currentIndex - 1);
         }
     }, [currentIndex, history.length]);
 
@@ -84,7 +84,7 @@ const App: React.FC = () => {
 
   const [offset, setOffset] = useState<number>(0);
   const [endTimePadding, setEndTimePadding] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [activeProcess, setActiveProcess] = useState<'transcribe' | 'generate' | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [isRefining, setIsRefining] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +97,9 @@ const App: React.FC = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
+  const subtitleInputRef = useRef<HTMLInputElement>(null);
 
+  const isLoading = activeProcess !== null;
 
   // Load draft from localStorage on initial mount
   useEffect(() => {
@@ -124,7 +126,7 @@ const App: React.FC = () => {
 
   // Auto-save SRT entries to localStorage with debouncing
   useEffect(() => {
-    if (isLoading || isRefining) return; // Don't save while a generation or refinement is in progress
+    if (isLoading || isRefining) return; // Don't save while a process is running
 
     const handler = setTimeout(() => {
         if (srtEntries.length > 0) {
@@ -209,8 +211,51 @@ const App: React.FC = () => {
     };
   }, [downloadMenuRef]);
 
-  const handleFileSelect = (file: File | null) => {
-    // If null, it's a removal, just proceed
+  const handleTranscribe = useCallback(async () => {
+    if (!videoFile) {
+        setError("Please upload a media file before transcribing.");
+        return;
+    }
+
+    setActiveProcess('transcribe');
+    setError(null);
+    resetSrtEntries([]);
+    setOffset(0);
+    setEndTimePadding(0);
+    setImportedFileName(null);
+
+    try {
+        // Step 1: Transcription
+        setLoadingMessage("Step 1/3: Transcribing audio...");
+        const videoBase64 = await fileToBase64(videoFile);
+        const transcribedText = await transcribeAudio(videoBase64, videoFile.type);
+        setLyrics(transcribedText);
+
+        // Step 2: Initial SRT Generation
+        setLoadingMessage("Step 2/3: Analyzing audio & syncing lyrics...");
+        const initialSrtData = await generateSrtFromVideoAndLyrics(videoBase64, videoFile.type, transcribedText);
+      
+        // Step 3: Refinement
+        setLoadingMessage("Step 3/3: Refining timings for accuracy...");
+        const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
+
+        resetSrtEntries(refinedSrtData);
+
+        // Automatically update the lyrics area with the final text from the SRT
+        const updatedLyrics = refinedSrtData.map(entry => entry.text).join('\n');
+        setLyrics(updatedLyrics);
+
+    } catch (e) {
+        console.error(e);
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        setError(`Failed to process: ${errorMessage}`);
+    } finally {
+        setActiveProcess(null);
+        setLoadingMessage('');
+    }
+  }, [videoFile, resetSrtEntries, setLyrics]);
+
+  const handleFileSelect = useCallback((file: File | null) => {
     if (!file) {
         setVideoFile(null);
         return;
@@ -218,46 +263,58 @@ const App: React.FC = () => {
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
         setError(`File is too large. Please select a file smaller than ${MAX_FILE_SIZE_MB}MB.`);
-        setVideoFile(null); // Clear any existing file
+        setVideoFile(null);
         return;
     }
-    setError(null); // Clear previous errors
+    setError(null);
     setVideoFile(file);
-  };
+  }, []);
 
-  const handleGenerate = useCallback(async () => {
-    if (!videoFile || !lyrics) {
-      setError("Please provide both a media file and the lyrics.");
-      return;
+  const handleGenerateSrt = useCallback(async (lyricsToGenerate: string) => {
+    if (!videoFile) {
+        setError("Please upload a media file before generating subtitles.");
+        return;
+    }
+    if (!lyricsToGenerate.trim()) {
+        setError("Lyrics are empty. Please provide lyrics to generate subtitles.");
+        return;
     }
 
-    setIsLoading(true);
+    setActiveProcess('generate');
     setError(null);
     resetSrtEntries([]);
     setOffset(0);
     setEndTimePadding(0);
-    setImportedFileName(null);
     // The old draft will be overwritten by the auto-save effect upon successful generation.
 
     try {
-      setLoadingMessage("Step 1/2: Analyzing audio & syncing lyrics...");
-      const videoBase64 = await fileToBase64(videoFile);
-      const initialSrtData = await generateSrtFromVideoAndLyrics(videoBase64, videoFile.type, lyrics);
-      
-      // Automatically refine the results for better accuracy
-      setLoadingMessage("Step 2/2: Refining timings for accuracy...");
-      const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
+        setLoadingMessage("Step 1/2: Analyzing audio & syncing lyrics...");
+        const videoBase64 = await fileToBase64(videoFile);
+        const initialSrtData = await generateSrtFromVideoAndLyrics(videoBase64, videoFile.type, lyricsToGenerate);
+        
+        setLoadingMessage("Step 2/2: Refining timings for accuracy...");
+        const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
 
-      resetSrtEntries(refinedSrtData);
+        resetSrtEntries(refinedSrtData);
+
+        // Automatically update the lyrics area with the final text from the SRT
+        const updatedLyrics = refinedSrtData.map(entry => entry.text).join('\n');
+        setLyrics(updatedLyrics);
+
     } catch (e) {
-      console.error(e);
-      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-      setError(`Failed to process: ${errorMessage}`);
+        console.error(e);
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        setError(`Failed to process: ${errorMessage}`);
     } finally {
-      setIsLoading(false);
-      setLoadingMessage('');
+        setActiveProcess(null);
+        setLoadingMessage('');
     }
-  }, [videoFile, lyrics, resetSrtEntries]);
+  }, [videoFile, resetSrtEntries, setLyrics]);
+  
+  const handleGenerate = useCallback(() => {
+    setImportedFileName(null);
+    handleGenerateSrt(lyrics);
+  }, [lyrics, handleGenerateSrt]);
   
   const handleRefineTimings = useCallback(async () => {
     if (!videoFile) {
@@ -399,10 +456,10 @@ const App: React.FC = () => {
 
   const handleEntryClick = (entry: SrtEntryData) => {
     if (videoRef.current) {
-        // Seek the video to the start time of the clicked entry
-        videoRef.current.currentTime = timestampToMs(entry.startTime) / 1000;
+        const seekTime = timestampToMs(entry.startTime) / 1000;
+        videoRef.current.currentTime = seekTime;
+        videoRef.current.play();
     }
-    // Set the clicked entry as the active one for editing
     setActiveIndex(entry.index);
   };
 
@@ -434,9 +491,23 @@ const App: React.FC = () => {
         }
 
         try {
-            let parsedEntries: SrtEntryData[] = [];
             const extension = file.name.split('.').pop()?.toLowerCase();
             
+            if (extension === 'txt') {
+                setError(null);
+                setLyrics(content);
+                setImportedFileName(file.name);
+                resetSrtEntries([]);
+                setOffset(0);
+                setEndTimePadding(0);
+                
+                if (videoFile) {
+                    handleGenerateSrt(content);
+                }
+                return;
+            }
+            
+            let parsedEntries: SrtEntryData[] = [];
             switch (extension) {
                 case 'srt':
                     parsedEntries = parseSrt(content);
@@ -476,6 +547,17 @@ const App: React.FC = () => {
         setImportedFileName(null);
     };
     reader.readAsText(file);
+  };
+
+  const handleImportClick = () => {
+    subtitleInputRef.current?.click();
+  };
+
+  const handleSubtitleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleImportSubtitles(e.target.files[0]);
+      e.target.value = ''; // Reset the input value so the same file can be selected again
+    }
   };
 
   const downloadFile = (content: string, fileName: string, mimeType: string) => {
@@ -518,16 +600,15 @@ const App: React.FC = () => {
     setIsDownloadMenuOpen(false);
   };
 
-
-  const canGenerate = videoFile !== null && lyrics.trim().length > 0 && !isLoading && !isRefining;
-
+  const allControlsDisabled = isRefining || isLoading;
+  const canGenerate = videoFile !== null && lyrics.trim().length > 0 && !allControlsDisabled;
+  const canTranscribe = videoFile !== null && !allControlsDisabled;
   const isAudio = videoFile?.type.startsWith('audio/');
   const uploadBoxTitle = videoFile 
     ? (isAudio ? '1. Preview Audio' : '1. Preview Video')
     : '1. Upload Video or Audio';
 
   const containerClasses = 'bg-gray-900 text-white font-sans flex flex-col min-h-screen lg:h-screen lg:overflow-hidden';
-  const allControlsDisabled = isRefining || isLoading;
 
   return (
     <div className={containerClasses}>
@@ -582,15 +663,45 @@ const App: React.FC = () => {
                   <FileUpload 
                       videoFile={videoFile} 
                       setVideoFile={handleFileSelect} 
-                      disabled={isLoading || isRefining}
+                      disabled={allControlsDisabled}
                       videoUrl={videoUrl}
                   />
                 </div>
 
                 <div className="p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col flex-grow min-h-0">
-                    <div className="flex justify-between items-center mb-4">
+                    <div className="flex justify-between items-center mb-4 flex-wrap gap-y-2">
                         <h2 className="text-lg font-semibold text-gray-200">2. Provide Lyrics</h2>
                         <div className="flex items-center gap-2">
+                             <button
+                                onClick={handleImportClick}
+                                disabled={allControlsDisabled}
+                                className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200
+                                            bg-gray-700 hover:bg-gray-600 text-gray-200
+                                            disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                title="Import subtitles from a file (.srt, .vtt, .lrc, .txt)"
+                            >
+                                <UploadIcon className="w-5 h-5" />
+                                Import
+                            </button>
+                             <input 
+                                type="file"
+                                ref={subtitleInputRef}
+                                onChange={handleSubtitleFileChange}
+                                accept=".srt,.vtt,.lrc,.txt"
+                                className="hidden"
+                                disabled={allControlsDisabled}
+                            />
+                            <button
+                                onClick={handleTranscribe}
+                                disabled={!canTranscribe}
+                                className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200
+                                            bg-gray-700 hover:bg-gray-600 text-gray-200
+                                            disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                title="Transcribe audio and generate subtitles in one step"
+                            >
+                                <MicrophoneIcon className="w-5 h-5" />
+                                {activeProcess === 'transcribe' ? 'Processing...' : 'Transcribe'}
+                            </button>
                              <button
                                 onClick={handleGenerate}
                                 disabled={!canGenerate}
@@ -600,15 +711,14 @@ const App: React.FC = () => {
                                             focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none"
                             >
                                 <SparklesIcon className="w-5 h-5" />
-                                {isLoading ? 'Generating...' : 'Generate'}
+                                {activeProcess === 'generate' ? 'Generating...' : 'Generate'}
                             </button>
                         </div>
                     </div>
                     <LyricsInput 
                         lyrics={lyrics} 
                         setLyrics={setLyrics} 
-                        disabled={isLoading || isRefining}
-                        onImport={handleImportSubtitles}
+                        disabled={allControlsDisabled}
                     />
                 </div>
             </div>

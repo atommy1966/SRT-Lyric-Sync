@@ -1,5 +1,7 @@
 {
   "name": "SRT Lyric Sync",
   "description": "Upload a audio or a video with audio and provide the SRT,VTT,LRC, or full lyrics to automatically generate a synchronized SRT,VTT,LRC subtitle file using AI.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "clipboard-read"
+  ]
 }

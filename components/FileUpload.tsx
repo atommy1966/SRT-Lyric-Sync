@@ -1,5 +1,5 @@
-import React from 'react';
-import { MusicNoteIcon, UploadIcon } from './icons';
+import React, { useState, useRef } from 'react';
+import { MusicNoteIcon, UploadIcon, PlayIcon, PauseIcon } from './icons';
 
 interface FileUploadProps {
   videoFile: File | null;
@@ -9,6 +9,9 @@ interface FileUploadProps {
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({ videoFile, setVideoFile, disabled, videoUrl }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setVideoFile(e.target.files[0]);
@@ -26,28 +29,63 @@ const FileUpload: React.FC<FileUploadProps> = ({ videoFile, setVideoFile, disabl
     }
   };
 
+  const handlePlayPause = () => {
+    const audio = audioRef.current;
+    if (audio) {
+      if (audio.paused) {
+        audio.play();
+      } else {
+        audio.pause();
+      }
+    }
+  };
+
   const isAudio = videoFile?.type.startsWith('audio/');
 
   if (videoFile && videoUrl) {
     if (isAudio) {
       return (
-        <div className="relative group bg-gray-800 rounded-lg p-4 flex items-center justify-center">
-          <audio
-            src={videoUrl}
-            controls
-            className="w-full relative z-10"
-            aria-label="Audio preview"
-          />
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-            <button
-              onClick={() => setVideoFile(null)}
-              disabled={disabled}
-              className="px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all"
-              aria-label="Remove media"
+        <div className="relative group">
+            {/* Hidden audio element for playback control */}
+            <audio 
+                ref={audioRef}
+                src={videoUrl}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={() => setIsPlaying(false)}
+                className="hidden"
+            />
+            {/* Visible custom control */}
+            <div 
+                onClick={handlePlayPause}
+                className="bg-gray-800 rounded-lg p-3 flex items-center w-full cursor-pointer hover:bg-gray-700 transition-colors"
+                role="button"
+                aria-label={`Play or pause audio file ${videoFile.name}`}
             >
-              Remove
-            </button>
-          </div>
+                <button 
+                    className="p-2 rounded-full bg-gray-700/50 hover:bg-gray-600 text-white flex-shrink-0 mr-3"
+                    aria-label={isPlaying ? 'Pause' : 'Play'}
+                >
+                    {isPlaying ? <PauseIcon className="w-5 h-5" /> : <PlayIcon className="w-5 h-5" />}
+                </button>
+                <span className="text-sm text-gray-300 truncate" title={videoFile.name}>
+                    {videoFile.name}
+                </span>
+            </div>
+            {/* Remove button appears on hover */}
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation(); // Prevent triggering play/pause
+                        setVideoFile(null);
+                    }}
+                    disabled={disabled}
+                    className="px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all"
+                    aria-label="Remove media"
+                >
+                    Remove
+                </button>
+            </div>
         </div>
       );
     }
