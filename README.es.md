@@ -28,6 +28,16 @@ Sube un archivo de audio o un video con audio y proporciona la letra completa o 
     *   **Soporte Multiformato**: Importa desde archivos `.txt`, `.srt`, `.vtt` y `.lrc`. Exporta tu trabajo a SRT, VTT o LRC con el menú de descarga simplificado.
     *   **Autoguardado y Restauración de Borradores**: Tu progreso se guarda automáticamente en tu navegador. Si te vas y vuelves, la aplicación te ofrecerá restaurar tu borrador no guardado.
 
+## 🎬 Casos de Uso
+
+Esta aplicación no es solo para sincronizar letras de canciones. Sus funciones de transcripción y edición de alta precisión con IA pueden optimizar tu flujo de trabajo en diversos escenarios:
+
+*   **Videos Musicales y Actuaciones en Vivo**: Crea subtítulos de letras perfectamente sincronizados para que los fans los disfruten.
+*   **Tutoriales y Videos Explicativos**: Añade subtítulos claros a videos instructivos para mejorar la comprensión del espectador.
+*   **Entrevistas y Podcasts**: Transcribe rápidamente entrevistas grabadas para acelerar significativamente la redacción de artículos y la edición de contenido.
+*   **Clases y Seminarios**: Convierte clases o seminarios en línea a texto para actas de reuniones o materiales de estudio.
+*   **Aprendizaje de Idiomas**: Transcribe canciones o discursos en idiomas extranjeros para crear potentes materiales para practicar la escucha y el *shadowing*.
+
 ## 🚀 Cómo Usar
 
 1.  **Subir Multimedia**: Arrastra y suelta o selecciona tu archivo de video/audio.

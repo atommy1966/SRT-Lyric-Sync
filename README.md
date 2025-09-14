@@ -28,6 +28,15 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
     *   **Multi-Format Support**: Import from `.txt`, `.srt`, `.vtt`, and `.lrc` files. Export your work to SRT, VTT, or LRC with the streamlined download menu.
     *   **Draft Autosave & Restore**: Your progress is automatically saved in your browser. If you leave and come back, the app will offer to restore your unsaved draft.
 
+## 🎬 Use Cases
+
+This app isn't just for syncing song lyrics. Its high-precision AI transcription and editing features can streamline your workflow in various scenarios:
+
+*   **Music Videos & Live Performances**: Create perfectly synced lyric subtitles for fans to enjoy.
+*   **Tutorials & Explainer Videos**: Add clear captions to instructional videos to improve viewer comprehension.
+*   **Interviews & Podcasts**: Quickly transcribe recorded interviews to significantly speed up article writing and content editing.
+*   **Lectures & Seminars**: Convert online lectures or seminars into text for meeting minutes or study materials.
+*   **Language Learning**: Transcribe foreign language songs or speeches to create powerful materials for listening and shadowing practice.
 
 ## 🚀 How to Use
 
