@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' https://aistudiocdn.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; connect-src 'self' https://generativelanguage.googleapis.com https://aistudiocdn.com;">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SRT Lyric Sync</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -9,8 +10,7 @@
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.1.1/client",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.18.0"
   }
 }
@@ -40,6 +40,1562 @@
 </head>
   <body class="bg-gray-900 text-white font-sans">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module">
+      import React, { useState, useCallback, useEffect, useRef, useImperativeHandle, forwardRef, useLayoutEffect } from 'react';
+      import ReactDOM from 'react-dom/client';
+      import { GoogleGenAI, Type } from "@google/genai";
+
+      // --- Start of inlined files ---
+
+      // ** utils/fileUtils.ts **
+      const fileToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => {
+            const result = reader.result;
+            const base64String = result.split(',')[1];
+            if (base64String) {
+              resolve(base64String);
+            } else {
+              reject(new Error("Failed to read file as base64. The result was empty."));
+            }
+          };
+          reader.onerror = (error) => reject(error);
+        });
+      };
+
+      // ** utils/srtUtils.ts **
+      const normalizeTimestamp = (timestamp) => {
+          if (!timestamp || typeof timestamp !== 'string') {
+              return '00:00:00,000';
+          }
+          const trimmedTimestamp = timestamp.trim();
+          const msMatch = trimmedTimestamp.match(/(.*)([.,:])(\d{1,3})$/);
+          let timePart;
+          let msPart = '000';
+          if (msMatch) {
+              timePart = msMatch[1];
+              msPart = msMatch[3];
+          } else {
+              timePart = trimmedTimestamp;
+          }
+          const timeSegments = timePart.split(':').map(s => s.trim()).filter(Boolean);
+          let hours = 0, minutes = 0, seconds = 0;
+          if (timeSegments.length === 3) {
+              hours = parseInt(timeSegments[0], 10) || 0;
+              minutes = parseInt(timeSegments[1], 10) || 0;
+              seconds = parseInt(timeSegments[2], 10) || 0;
+          } else if (timeSegments.length === 2) {
+              minutes = parseInt(timeSegments[0], 10) || 0;
+              seconds = parseInt(timeSegments[1], 10) || 0;
+          } else if (timeSegments.length === 1 && timeSegments[0] !== '') {
+              seconds = parseInt(timeSegments[0], 10) || 0;
+          }
+          if (seconds >= 60) {
+              minutes += Math.floor(seconds / 60);
+              seconds %= 60;
+          }
+          if (minutes >= 60) {
+              hours += Math.floor(minutes / 60);
+              minutes %= 60;
+          }
+          const paddedHours = String(hours).padStart(2, '0');
+          const paddedMinutes = String(minutes).padStart(2, '0');
+          const paddedSeconds = String(seconds).padStart(2, '0');
+          const paddedMs = msPart.padEnd(3, '0').substring(0, 3);
+          return `${paddedHours}:${paddedMinutes}:${paddedSeconds},${paddedMs}`;
+      };
+      const timestampToMs = (timestamp) => {
+          const normalized = normalizeTimestamp(timestamp);
+          const match = normalized.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3})/);
+          if (!match) return 0;
+          const [, hours, minutes, seconds, ms] = match;
+          return (parseInt(hours, 10) * 3600 + parseInt(minutes, 10) * 60 + parseInt(seconds, 10)) * 1000 + parseInt(ms, 10);
+      };
+      const msToTimestamp = (totalMs) => {
+          if (totalMs < 0) totalMs = 0;
+          const ms = Math.floor(totalMs % 1000);
+          const totalSeconds = Math.floor(totalMs / 1000);
+          const seconds = totalSeconds % 60;
+          const totalMinutes = Math.floor(totalSeconds / 60);
+          const minutes = totalMinutes % 60;
+          const hours = Math.floor(totalMinutes / 60);
+          const paddedHours = String(hours).padStart(2, '0');
+          const paddedMinutes = String(minutes).padStart(2, '0');
+          const paddedSeconds = String(seconds).padStart(2, '0');
+          const paddedMs = String(ms).padStart(3, '0');
+          return `${paddedHours}:${paddedMinutes}:${paddedSeconds},${paddedMs}`;
+      };
+      const parseSrt = (srtContent) => {
+        if (!srtContent) return [];
+        const entries = [];
+        const blocks = srtContent.trim().split(/\r?\n\s*\r?\n/);
+        for (const block of blocks) {
+          const lines = block.trim().split(/\r?\n/);
+          if (lines.length < 2) continue;
+          const index = parseInt(lines[0], 10);
+          const timeMatch = lines[1].match(/(.*?)\s*-->\s*(.*)/);
+          if (isNaN(index) || !timeMatch) continue;
+          const startTime = normalizeTimestamp(timeMatch[1]);
+          const endTime = normalizeTimestamp(timeMatch[2]);
+          const text = lines.slice(2).join('\n');
+          entries.push({ index, startTime, endTime, text });
+        }
+        return entries;
+      };
+      const parseVtt = (vttContent) => {
+          if (!vttContent) return [];
+          const entries = [];
+          const blocks = vttContent.trim().replace(/^WEBVTT\s*/, '').split(/\r?\n\s*\r?\n/);
+          let entryIndex = 1;
+          for (const block of blocks) {
+              const lines = block.trim().split(/\r?\n/);
+              if (lines.length === 0) continue;
+              const timeMatch = lines[0].match(/(.*?)\s*-->\s*(.*?)(?:\s+.*)?$/);
+              if (timeMatch) {
+                  const startTime = normalizeTimestamp(timeMatch[1]);
+                  const endTime = normalizeTimestamp(timeMatch[2]);
+                  const text = lines.slice(1).join('\n');
+                  entries.push({ index: entryIndex++, startTime, endTime, text });
+              }
+          }
+          return entries;
+      };
+      const lrcTimestampToMs = (lrcTimestamp) => {
+          const match = lrcTimestamp.match(/(\d{2}):(\d{2})\.(\d{2})/);
+          if (!match) return 0;
+          const [, minutes, seconds, centiseconds] = match;
+          return (parseInt(minutes, 10) * 60 + parseInt(seconds, 10)) * 1000 + parseInt(centiseconds, 10) * 10;
+      };
+      const parseLrc = (lrcContent) => {
+          if (!lrcContent) return [];
+          const timedLines = [];
+          const lines = lrcContent.trim().split(/\r?\n/);
+          const lineRegex = /\[(\d{2}:\d{2}\.\d{2})\](.*)/;
+          for (const line of lines) {
+              const match = line.match(lineRegex);
+              if (match) {
+                  const timeMs = lrcTimestampToMs(match[1]);
+                  const text = match[2].trim();
+                  if (text) {
+                      timedLines.push({ timeMs, text });
+                  }
+              }
+          }
+          if (timedLines.length === 0) return [];
+          return timedLines.map((line, i) => {
+              const startTimeMs = line.timeMs;
+              const endTimeMs = (i < timedLines.length - 1) 
+                  ? timedLines[i + 1].timeMs 
+                  : startTimeMs + 3000;
+              return {
+                  index: i + 1,
+                  startTime: msToTimestamp(startTimeMs),
+                  endTime: msToTimestamp(endTimeMs),
+                  text: line.text,
+              };
+          });
+      };
+      const serializeSrt = (entries) => {
+        return entries
+          .map((entry, i) => {
+            const index = i + 1;
+            const normalizedStartTime = normalizeTimestamp(entry.startTime);
+            const normalizedEndTime = normalizeTimestamp(entry.endTime);
+            const srtStartTime = normalizedStartTime;
+            const srtEndTime = normalizedEndTime;
+            const textWithCrlf = entry.text.replace(/\r?\n/g, '\r\n');
+            return `${index}\r\n${srtStartTime} --> ${srtEndTime}\r\n${textWithCrlf}`;
+          })
+          .join('\r\n\r\n');
+      };
+      const srtToVtt = (srtContent) => {
+        if (!srtContent) return 'WEBVTT';
+        const vttHeader = 'WEBVTT\n\n';
+        const blocks = srtContent.trim().split(/\r?\n\s*\r?\n/);
+        const vttBlocks = blocks.map(block => {
+          const lines = block.split(/\r?\n/);
+          if (lines.length < 2) {
+            return '';
+          }
+          const timestampIndex = lines.findIndex(line => line.includes('-->'));
+          if (timestampIndex === -1) {
+            return '';
+          }
+          let timestampLine = lines[timestampIndex];
+          timestampLine = timestampLine.replace(/,(\d{3})/g, '.$1');
+          timestampLine += ' line:45% position:50% align:middle size:80%';
+          const textLines = lines.slice(timestampIndex + 1);
+          return `${timestampLine}\n${textLines.join('\n')}`;
+        }).filter(block => block).join('\n\n');
+        return vttHeader + vttBlocks;
+      };
+      const msToLrcTimestamp = (totalMs) => {
+          if (totalMs < 0) totalMs = 0;
+          const totalSeconds = Math.floor(totalMs / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          const centiseconds = Math.floor((totalMs % 1000) / 10);
+          const paddedMinutes = String(minutes).padStart(2, '0');
+          const paddedSeconds = String(seconds).padStart(2, '0');
+          const paddedCentiseconds = String(centiseconds).padStart(2, '0');
+          return `[${paddedMinutes}:${paddedSeconds}.${paddedCentiseconds}]`;
+      };
+      const serializeLrc = (entries) => {
+          return entries
+            .map(entry => {
+              const timestampMs = timestampToMs(entry.startTime);
+              const lrcTimestamp = msToLrcTimestamp(timestampMs);
+              const text = entry.text.replace(/\r?\n/g, ' ');
+              return `${lrcTimestamp}${text}`;
+            })
+            .join('\r\n');
+      };
+
+      // ** services/geminiService.ts **
+      const API_KEY = process.env.API_KEY;
+      if (!API_KEY) {
+        console.error("API_KEY environment variable is not set.");
+      }
+      const ai = new GoogleGenAI({ apiKey: API_KEY });
+      const extractJson = (text) => {
+          const match = text.match(/```json\s*([\s\S]*?)\s*```/);
+          if (match && match[1]) {
+              return match[1];
+          }
+          const firstBracket = text.indexOf('[');
+          const lastBracket = text.lastIndexOf(']');
+          if (firstBracket !== -1 && lastBracket !== -1) {
+              return text.substring(firstBracket, lastBracket + 1);
+          }
+          return text.trim();
+      };
+      const srtDataSchema = {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              index: { type: Type.INTEGER },
+              startTime: { type: Type.STRING },
+              endTime: { type: Type.STRING },
+              text: { type: Type.STRING },
+            },
+            required: ["index", "startTime", "endTime", "text"],
+          },
+      };
+      const processAiResponse = (rawText) => {
+          if (!rawText) {
+              throw new Error("The AI returned an empty response.");
+          }
+          const cleanedJsonString = extractJson(rawText);
+          let result;
+          try {
+              result = JSON.parse(cleanedJsonString);
+          } catch (parseError) {
+              console.error("Failed to parse cleaned JSON:", cleanedJsonString);
+              throw new Error("The AI returned data in a format that could not be read.");
+          }
+          if (Array.isArray(result) && result.every(item => 
+              typeof item.index === 'number' &&
+              typeof item.startTime === 'string' &&
+              typeof item.endTime === 'string' &&
+              typeof item.text === 'string'
+          )) {
+             if (result.length === 0) {
+              throw new Error("The AI returned an empty list of subtitles.");
+            }
+            const normalizedResult = result.map(item => ({
+                  ...item,
+                  startTime: normalizeTimestamp(item.startTime),
+                  endTime: normalizeTimestamp(item.endTime),
+            }));
+            return normalizedResult;
+          } else {
+            console.error("AI response did not match expected schema:", result);
+            throw new Error("The AI response was not in the expected format.");
+          }
+      }
+      const generateSrtFromVideoAndLyrics = async (videoBase64, mimeType, lyrics) => {
+        try {
+          const videoPart = { inlineData: { data: videoBase64, mimeType: mimeType } };
+          const prompt = `
+      You are a subtitle generation expert. Your task is to synchronize the provided lyrics with the audio from the video.
+      Return a JSON array where each object represents a subtitle line.
+
+      **JSON Object Structure:**
+      - \`index\`: Sequential number, starting at 1.
+      - \`startTime\`: Start timestamp in \`HH:MM:SS,ms\` format (e.g., \`00:01:23,456\`). **Crucially, use a comma (,) before the milliseconds.**
+      - \`endTime\`: End timestamp in \`HH:MM:SS,ms\` format (e.g., \`00:01:25,789\`). **Crucially, use a comma (,) before the milliseconds.**
+      - \`text\`: The line of lyric text.
+
+      **Important Rules:**
+      1.  Analyze the video's audio to find the precise start and end times for each line of the provided lyrics.
+      2.  Make a best-effort guess for timings if a perfect match is not possible. Do not leave any lyric line out.
+      3.  The final output must be ONLY the JSON array. Do not include any other text or markdown.
+
+      **Lyrics to synchronize:**
+      ---
+      ${lyrics}
+      ---
+      `;
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [videoPart, { text: prompt }] },
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: srtDataSchema,
+            },
+          });
+          return processAiResponse(response.text);
+        } catch (error) {
+          console.error("Error generating SRT content:", error);
+          if (error instanceof Error) {
+              throw new Error(`Failed to generate subtitles. Details: ${error.message}`);
+          }
+          throw new Error("An unknown error occurred while generating subtitles.");
+        }
+      };
+      const refineSrtTimings = async (videoBase64, mimeType, currentEntries) => {
+          try {
+              const videoPart = { inlineData: { data: videoBase64, mimeType: mimeType } };
+              const prompt = `
+      You are an expert subtitle timing refinement tool.
+      Your task is to analyze the audio from the provided video and adjust the timings for an existing set of subtitles to be as precise as possible.
+
+      **Input:** You will receive a JSON array of subtitle entries.
+      **Output:** You must return the full, updated list of subtitles in the exact same JSON array format.
+
+      **IMPORTANT Rules:**
+      1.  Adjust the \`startTime\` and \`endTime\` for each entry to perfectly match when the vocals for that line are sung.
+      2.  **Crucially for \`endTime\`, the timestamp must mark the *very end* of the vocal phrase. This includes sustained notes (long tones), reverberation, and vocal trails. The subtitle should remain visible until the singer's voice for that specific text has completely faded or the next sung line begins.**
+      3.  DO NOT change the \`text\`, \`index\`, or the order of the entries.
+      4.  Ensure timestamps are in \`HH:MM:SS,ms\` format. **Use a comma (,) before the milliseconds.**
+      5.  Your entire response must be ONLY the JSON array. Do not add any extra text, explanations, or markdown formatting.
+
+      **Subtitles to refine:**
+      ---
+      ${JSON.stringify(currentEntries, null, 2)}
+      ---
+      `;
+              const response = await ai.models.generateContent({
+                  model: 'gemini-2.5-flash',
+                  contents: { parts: [videoPart, { text: prompt }] },
+                  config: {
+                    responseMimeType: "application/json",
+                    responseSchema: srtDataSchema,
+                  },
+              });
+              const refinedEntries = processAiResponse(response.text);
+              if (refinedEntries.length !== currentEntries.length) {
+                  console.error("Refinement process failed: AI returned a different number of entries.", { originalCount: currentEntries.length, refinedCount: refinedEntries.length });
+                  throw new Error("The AI failed to follow instructions and changed the number of subtitle lines. Please try again.");
+              }
+              const resilientRefinedEntries = currentEntries.map((originalEntry, i) => {
+                  const refinedEntry = refinedEntries[i];
+                  return { ...originalEntry, startTime: refinedEntry.startTime, endTime: refinedEntry.endTime };
+              });
+              return resilientRefinedEntries;
+          } catch (error) {
+              console.error("Error refining SRT timings:", error);
+              if (error instanceof Error) {
+                  throw new Error(`Failed to refine timings. Details: ${error.message}`);
+              }
+              throw new Error("An unknown error occurred while refining timings.");
+          }
+      };
+      const transcribeAudio = async (videoBase64, mimeType) => {
+        try {
+          const audioPart = { inlineData: { data: videoBase64, mimeType: mimeType } };
+          const prompt = `
+      You are an expert audio transcription service.
+      Your task is to transcribe the audio from the provided media file accurately.
+      Please format the output with appropriate line breaks to ensure readability.
+      - If the content sounds like song lyrics, format each sung line on a new line.
+      - If the content is spoken word (like a speech or dialogue), break the text into paragraphs or sentences at natural pauses.
+      Your final output should be only the transcribed text. Do not add any titles, headers, or other formatting.
+      `;
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [audioPart, { text: prompt }] },
+          });
+          return response.text.trim();
+        } catch (error) {
+          console.error("Error transcribing audio:", error);
+          if (error instanceof Error) {
+              throw new Error(`Failed to transcribe audio. Details: ${error.message}`);
+          }
+          throw new Error("An unknown error occurred while transcribing audio.");
+        }
+      };
+      
+      // ** components/icons.tsx **
+      const CE = React.createElement;
+      const UploadIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" }));
+      const VideoIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" }));
+      const DownloadIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }));
+      const CopyIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" }));
+      const CheckIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "2", stroke: "currentColor" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M5 13l4 4L19 7" }));
+      const TrashIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }));
+      const ArrowUpIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M5 15l7-7 7 7" }));
+      const ArrowDownIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 9l-7 7-7-7" }));
+      const PlusIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 4v16m8-8H4" }));
+      const EditIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" }));
+      const PlayIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" }), CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }));
+      const ChevronDoubleDownIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 13l-7 7-7-7m14-8l-7 7-7-7" }));
+      const UndoIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M11 15l-3-3m0 0l3-3m-3 3h8a5 5 0 000-10H9" }));
+      const RedoIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M13 15l3-3m0 0l-3-3m3 3H5a5 5 0 000 10h1" }));
+      const ArchiveBoxIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" }), CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 12l8 4 8-4" }));
+      const SparklesIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "1.5", stroke: "currentColor" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.562L16.25 22.5l-.648-1.938a2.25 2.25 0 01-1.465-1.465L12 18.75l1.938-.648a2.25 2.25 0 011.465-1.465L17.25 15l.648 1.938a2.25 2.25 0 011.465 1.465L21 18.75l-1.938.648a2.25 2.25 0 01-1.465 1.465z" }));
+      const ArrowPathIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "1.5", stroke: "currentColor" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.18-3.185m-3.181 9.995l-3.182-3.182a8.25 8.25 0 010-11.664l3.181-3.182m0 0h-4.992m4.992 0v4.992" }));
+      const GripVerticalIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, CE('circle', { cx: "9", cy: "12", r: "1" }), CE('circle', { cx: "9", cy: "5", r: "1" }), CE('circle', { cx: "9", cy: "19", r: "1" }), CE('circle', { cx: "15", cy: "12", r: "1" }), CE('circle', { cx: "15", cy: "5", r: "1" }), CE('circle', { cx: "15", cy: "19", r: "1" }));
+      const XIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18L18 6M6 6l12 12" }));
+      const MusicNoteIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.5 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163z" }), CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 9V4.5M9 9l-3 1.5M12 12v5.25m0 0l-3 1.5m3-1.5l3-1.5m-3 1.5V12m6-6v4.5m0-4.5l-3 1.5m3-1.5l-3-1.5M9 15v5.25m0 0l-3 1.5m3-1.5l3-1.5m-3 1.5V15" }));
+      const TargetIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "1.5", stroke: "currentColor" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-2.474-1.905-1.338 2.324-.318L13.684 10l.693 2.563 2.324.317-1.905 1.338.569 2.474zM12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM12 21.75a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" }));
+      const ScissorsIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "1.5", stroke: "currentColor" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M8.25 3.75H19.5M8.25 3.75V19.5M8.25 3.75C5.48 3.75 3 5.954 3 8.625c0 2.67 2.48 4.875 5.25 4.875V19.5M8.25 19.5C5.48 19.5 3 17.296 3 14.625c0-2.67 2.48-4.875 5.25-4.875" }));
+      const PauseIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" }));
+      const VolumeUpIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" }));
+      const VolumeOffIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z", clipRule: "evenodd" }), CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" }));
+      const ExpandIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" }));
+      const ChevronDownIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "2", stroke: "currentColor" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M19.5 8.25l-7.5 7.5-7.5-7.5" }));
+      const MicrophoneIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.5 }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 016 0v8.25a3 3 0 01-3 3z" }));
+      const ClipboardPasteIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "1.5", stroke: "currentColor" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a2.25 2.25 0 01-2.25 2.25h-1.5a2.25 2.25 0 01-2.25-2.25v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" }));
+      
+      // ** components/Loader.tsx **
+      const Loader = ({ message }) => {
+        return CE('div', { className: "flex flex-col items-center justify-center h-full text-center p-8 bg-gray-800/50 rounded-lg" },
+          CE('div', { className: "w-16 h-16 border-4 border-dashed rounded-full animate-spin border-teal-400" }),
+          CE('p', { className: "mt-4 text-lg text-gray-300" }, message),
+          CE('p', { className: "mt-2 text-sm text-gray-400" }, "This may take a few minutes for longer videos.")
+        );
+      };
+
+      // ** components/FileUpload.tsx **
+      const FileUpload = ({ videoFile, setVideoFile, disabled, videoUrl }) => {
+        const [isPlaying, setIsPlaying] = useState(false);
+        const audioRef = useRef(null);
+        const handleFileChange = (e) => {
+          if (e.target.files && e.target.files[0]) {
+            setVideoFile(e.target.files[0]);
+          }
+        };
+        const handleDragOver = (e) => e.preventDefault();
+        const handleDrop = (e) => {
+          e.preventDefault();
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            setVideoFile(e.dataTransfer.files[0]);
+          }
+        };
+        const handlePlayPause = () => {
+          const audio = audioRef.current;
+          if (audio) {
+            if (audio.paused) audio.play();
+            else audio.pause();
+          }
+        };
+        const isAudio = videoFile?.type.startsWith('audio/');
+        if (videoFile && videoUrl) {
+          if (isAudio) {
+            return CE('div', { className: "relative group" },
+              CE('audio', { ref: audioRef, src: videoUrl, onPlay: () => setIsPlaying(true), onPause: () => setIsPlaying(false), onEnded: () => setIsPlaying(false), className: "hidden" }),
+              CE('div', { onClick: handlePlayPause, className: "bg-gray-800 rounded-lg p-3 flex items-center w-full cursor-pointer hover:bg-gray-700 transition-colors", role: "button", "aria-label": `Play or pause audio file ${videoFile.name}` },
+                CE('button', { className: "p-2 rounded-full bg-gray-700/50 hover:bg-gray-600 text-white flex-shrink-0 mr-3", "aria-label": isPlaying ? 'Pause' : 'Play' },
+                  isPlaying ? CE(PauseIcon, { className: "w-5 h-5" }) : CE(PlayIcon, { className: "w-5 h-5" })
+                ),
+                CE('span', { className: "text-sm text-gray-300 truncate", title: videoFile.name }, videoFile.name)
+              ),
+              CE('div', { className: "absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20" },
+                CE('button', { onClick: (e) => { e.stopPropagation(); setVideoFile(null); }, disabled, className: "px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all", "aria-label": "Remove media" }, "Remove")
+              )
+            );
+          }
+          return CE('div', { className: "relative group bg-black rounded-lg max-h-48 flex items-center justify-center" },
+            CE('video', { src: videoUrl, controls: true, className: "w-full max-h-full max-w-full rounded-lg object-contain relative z-10 bg-transparent", "aria-label": "Video preview" }, "Your browser does not support the video tag."),
+            CE('div', { className: "absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20" },
+              CE('button', { onClick: () => setVideoFile(null), disabled, className: "px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all", "aria-label": "Remove media" }, "Remove")
+            )
+          );
+        }
+        return CE('div', { className: "flex items-center justify-center w-full" },
+          CE('label', { htmlFor: "dropzone-file", onDragOver: handleDragOver, onDrop: handleDrop, className: `flex flex-col items-center justify-center w-full h-40 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer bg-gray-800 hover:bg-gray-700 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : ''}` },
+            CE('div', { className: "flex flex-col items-center justify-center pt-5 pb-6" },
+              CE(UploadIcon, { className: "w-10 h-10 mb-3 text-gray-400" }),
+              CE('p', { className: "mb-2 text-sm text-gray-400" }, CE('span', { className: "font-semibold text-teal-400" }, "Click to upload"), " or drag and drop"),
+              CE('p', { className: "text-xs text-gray-500" }, "Video (MP4, MOV) or Audio (MP3, WAV)"),
+              CE('p', { className: "text-xs text-gray-500" }, "Max file size: 15MB")
+            ),
+            CE('input', { id: "dropzone-file", type: "file", className: "hidden", accept: "video/*,audio/*", onChange: handleFileChange, disabled })
+          )
+        );
+      };
+
+      // ** components/LyricsInput.tsx **
+      const LyricsInput = ({ lyrics, setLyrics, disabled }) => {
+        const [copied, setCopied] = useState(false);
+        const textareaRef = useRef(null);
+        const handleCopy = () => {
+          if (lyrics) {
+              navigator.clipboard.writeText(lyrics).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+              }).catch(err => {
+                  console.error('Failed to copy text: ', err);
+                  alert('Failed to copy lyrics. Please try again.');
+              });
+          }
+        };
+        const handlePaste = async () => {
+          if (disabled) return;
+          textareaRef.current?.focus();
+          try {
+              const text = await navigator.clipboard.readText();
+              if (text) {
+                  setLyrics(text);
+              }
+          } catch (err) {
+              console.error('Failed to paste from clipboard:', err);
+              alert(
+                  "Pasting with the button was blocked by your browser.\n\n" +
+                  "This is a common security measure in modern web browsers, especially in secure environments.\n\n" +
+                  "Please paste directly into the text area using your keyboard (Ctrl+V or Cmd+V)."
+              );
+          }
+        };
+        return CE('div', { className: "flex flex-col h-full" },
+          CE('div', { className: "relative flex-grow" },
+            CE('textarea', { ref: textareaRef, id: "lyrics", "aria-label": "Paste Lyrics", value: lyrics, onChange: (e) => setLyrics(e.target.value), disabled, placeholder: "Paste lyrics here, or upload a media file and click 'Transcribe'...", className: "w-full h-full p-4 pr-16 bg-gray-800 border border-gray-600 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" }),
+            CE('div', { className: "absolute top-2.5 right-2.5 flex items-center gap-1" },
+              lyrics.length === 0 && !disabled && CE('button', { onClick: handlePaste, className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": "Paste lyrics", title: "Paste from clipboard" }, CE(ClipboardPasteIcon, { className: "w-5 h-5" })),
+              lyrics.length > 0 && !disabled && CE(React.Fragment, null,
+                CE('button', { onClick: handleCopy, className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": copied ? "Copied" : "Copy lyrics", title: copied ? "Copied!" : "Copy lyrics" },
+                  copied ? CE(CheckIcon, { className: "w-5 h-5 text-teal-400" }) : CE(CopyIcon, { className: "w-5 h-5" })
+                ),
+                CE('button', { onClick: () => setLyrics(''), className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": "Clear lyrics", title: "Clear lyrics" },
+                  CE(XIcon, { className: "w-5 h-5" })
+                )
+              )
+            )
+          )
+        );
+      };
+
+      // ** components/CustomVideoControls.tsx **
+      const CustomVideoControls = ({ isPlaying, onPlayPause, currentTime, duration, onSeek, volume, onVolumeChange, isMuted, onMuteToggle, onFullscreen, isVisible }) => {
+        const formatTime = (timeInSeconds) => {
+          if (isNaN(timeInSeconds) || timeInSeconds < 0) return '00:00';
+          const time = Math.floor(timeInSeconds);
+          const minutes = Math.floor(time / 60);
+          const seconds = time % 60;
+          return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        };
+        const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+        return CE('div', { className: `absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`, onClick: (e) => e.stopPropagation() },
+          CE('div', { className: "relative mb-2 group" },
+            CE('input', { type: "range", min: "0", max: duration || 0, value: currentTime, onChange: (e) => onSeek(parseFloat(e.target.value)), className: "w-full h-1.5 bg-gray-500/50 rounded-lg appearance-none cursor-pointer group-hover:h-2 transition-all duration-200", style: { background: `linear-gradient(to right, #2DD4BF ${progress}%, #4B5563 ${progress}%)` }, "aria-label": "Seek slider" })
+          ),
+          CE('div', { className: "flex items-center justify-between" },
+            CE('div', { className: "flex items-center gap-4" },
+              CE('button', { onClick: onPlayPause, className: "text-white hover:text-teal-400 transition-colors", "aria-label": isPlaying ? "Pause" : "Play" },
+                isPlaying ? CE(PauseIcon, { className: "w-8 h-8" }) : CE(PlayIcon, { className: "w-8 h-8" })
+              ),
+              CE('div', { className: "flex items-center gap-2" },
+                CE('button', { onClick: onMuteToggle, className: "text-white hover:text-teal-400 transition-colors", "aria-label": isMuted ? "Unmute" : "Mute" },
+                  isMuted || volume === 0 ? CE(VolumeOffIcon, { className: "w-6 h-6" }) : CE(VolumeUpIcon, { className: "w-6 h-6" })
+                ),
+                CE('input', { type: "range", min: "0", max: "1", step: "0.05", value: isMuted ? 0 : volume, onChange: (e) => onVolumeChange(parseFloat(e.target.value)), className: "w-24 h-1.5 bg-gray-500/50 rounded-lg appearance-none cursor-pointer", "aria-label": "Volume" })
+              )
+            ),
+            CE('div', { className: "flex items-center gap-4" },
+              CE('span', { className: "text-sm font-mono text-white" }, `${formatTime(currentTime)} / ${formatTime(duration)}`),
+              CE('button', { onClick: onFullscreen, className: "text-white hover:text-teal-400 transition-colors", "aria-label": "Fullscreen" },
+                CE(ExpandIcon, { className: "w-6 h-6" })
+              )
+            )
+          )
+        );
+      };
+
+      // ** components/VideoPreview.tsx **
+      const VideoPreview = forwardRef(({ videoFile, videoUrl, entries, onTimeUpdate }, ref) => {
+        const localVideoRef = useRef(null);
+        const containerRef = useRef(null);
+        const trackRef = useRef(null);
+        const controlsTimeoutRef = useRef(null);
+        const [isPlaying, setIsPlaying] = useState(false);
+        const [duration, setDuration] = useState(0);
+        const [volume, setVolume] = useState(1);
+        const [isMuted, setIsMuted] = useState(false);
+        const [currentTime, setCurrentTime] = useState(0);
+        const [areControlsVisible, setAreControlsVisible] = useState(true);
+        const [isTrackReady, setIsTrackReady] = useState(false);
+
+        useImperativeHandle(ref, () => localVideoRef.current);
+
+        useEffect(() => {
+          const video = localVideoRef.current;
+          if (!video) return;
+          setIsTrackReady(false);
+          const setupTrack = () => {
+            let track = Array.from(video.textTracks).find(t => t.label === 'Live Subtitles');
+            if (!track) {
+              track = video.addTextTrack('subtitles', 'Live Subtitles', 'en');
+            }
+            track.mode = 'showing';
+            trackRef.current = track;
+            setIsTrackReady(true);
+          };
+          if (video.readyState >= 1) {
+            setupTrack();
+          } else {
+            video.addEventListener('loadedmetadata', setupTrack, { once: true });
+          }
+          setVolume(video.volume);
+          setIsMuted(video.muted);
+          return () => {
+            video.removeEventListener('loadedmetadata', setupTrack);
+            setIsTrackReady(false);
+          };
+        }, [videoUrl]);
+
+        useEffect(() => {
+          if (!isTrackReady) return;
+          const track = trackRef.current;
+          if (!track) return;
+          if (track.cues) {
+            while (track.cues.length > 0) {
+              track.removeCue(track.cues[0]);
+            }
+          }
+          entries.forEach(entry => {
+            const startTime = timestampToMs(entry.startTime) / 1000;
+            const endTime = timestampToMs(entry.endTime) / 1000;
+            if (startTime < endTime) {
+              const cue = new VTTCue(startTime, endTime, entry.text);
+              cue.line = 90;
+              cue.lineAlign = 'end';
+              cue.position = 50;
+              cue.align = 'center';
+              cue.size = 80;
+              track.addCue(cue);
+            }
+          });
+        }, [entries, isTrackReady]);
+
+        const handlePlayPause = () => {
+          const video = localVideoRef.current;
+          if (video) video.paused ? video.play() : video.pause();
+        };
+        const handleSeek = (time) => {
+          const video = localVideoRef.current;
+          if (video) {
+            video.currentTime = time;
+            setCurrentTime(time);
+          }
+        };
+        const handleVolumeChange = (newVolume) => {
+          const video = localVideoRef.current;
+          if (video) {
+            video.muted = false;
+            video.volume = newVolume;
+          }
+        };
+        const handleMuteToggle = () => {
+          const video = localVideoRef.current;
+          if (video) video.muted = !video.muted;
+        };
+        const handleFullscreen = () => {
+          const container = containerRef.current;
+          if (container) {
+            if (!document.fullscreenElement) {
+              container.requestFullscreen().catch(err => {
+                alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+              });
+            } else {
+              document.exitFullscreen();
+            }
+          }
+        };
+        const handleTimeUpdateEvent = (e) => {
+          const time = e.currentTarget.currentTime;
+          setCurrentTime(time);
+          onTimeUpdate(time);
+        };
+        const handleLoadedMetadata = (e) => setDuration(e.currentTarget.duration);
+        const handleVolumeChangeOnVideo = (e) => {
+          setVolume(e.currentTarget.volume);
+          setIsMuted(e.currentTarget.muted);
+        };
+        const showControls = () => {
+          if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+          setAreControlsVisible(true);
+          controlsTimeoutRef.current = window.setTimeout(() => {
+            if (!localVideoRef.current?.paused) setAreControlsVisible(false);
+          }, 3000);
+        };
+        const handleContainerClick = () => handlePlayPause();
+        useEffect(() => {
+          const container = containerRef.current;
+          const video = localVideoRef.current;
+          const handleMouseLeave = () => {
+              if (video && !video.paused) setAreControlsVisible(false);
+          };
+          if (container) {
+            container.addEventListener('mousemove', showControls);
+            container.addEventListener('mouseleave', handleMouseLeave);
+          }
+          return () => {
+            if (container) {
+              container.removeEventListener('mousemove', showControls);
+              container.removeEventListener('mouseleave', handleMouseLeave);
+            }
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+          }
+        }, [isPlaying]);
+
+        return CE('div', { ref: containerRef, className: "w-full h-full flex items-center justify-center relative bg-black group", onClick: handleContainerClick },
+          CE('video', {
+            ref: localVideoRef,
+            crossOrigin: "anonymous",
+            className: "w-full h-full max-h-full max-w-full object-contain",
+            onTimeUpdate: handleTimeUpdateEvent,
+            onLoadedMetadata: handleLoadedMetadata,
+            onPlay: () => { setIsPlaying(true); showControls(); },
+            onPause: () => { setIsPlaying(false); setAreControlsVisible(true); },
+            onVolumeChange: handleVolumeChangeOnVideo,
+            key: videoUrl,
+          }, CE('source', { src: videoUrl, type: videoFile.type }), "Your browser does not support the video tag."),
+          CE(CustomVideoControls, {
+            isPlaying,
+            onPlayPause: handlePlayPause,
+            currentTime,
+            duration,
+            onSeek: handleSeek,
+            volume,
+            onVolumeChange: handleVolumeChange,
+            isMuted,
+            onMuteToggle: handleMuteToggle,
+            onFullscreen: handleFullscreen,
+            isVisible: areControlsVisible,
+          })
+        );
+      });
+
+      // ** components/SrtEntry.tsx **
+      const SrtEntry = ({ entry, onUpdate, onSetTimeToCurrent, onContextMenu, onSplit, onClick, isActive, isCurrent, isFirst, isLast, index, isDragging, isDragOver, onDragStart, onDragOver, onDrop, onDragEnd }) => {
+        const [startTime, setStartTime] = useState(entry.startTime);
+        const [endTime, setEndTime] = useState(entry.endTime);
+        const [cursorPosition, setCursorPosition] = useState(0);
+        const textAreaRef = useRef(null);
+
+        useEffect(() => {
+          setStartTime(entry.startTime);
+          setEndTime(entry.endTime);
+        }, [entry.startTime, entry.endTime]);
+
+        const handleTimeChange = (e, field) => {
+          if (field === 'startTime') setStartTime(e.target.value);
+          else setEndTime(e.target.value);
+        };
+        const handleTimeBlur = (field) => {
+          const value = field === 'startTime' ? startTime : endTime;
+          const normalizedValue = normalizeTimestamp(value);
+          if (field === 'startTime') setStartTime(normalizedValue);
+          else setEndTime(normalizedValue);
+          const parentValue = field === 'startTime' ? entry.startTime : entry.endTime;
+          if (normalizedValue !== parentValue) {
+            onUpdate(entry.index, field, normalizedValue);
+          }
+        };
+        const handleTextChange = (e) => onUpdate(entry.index, 'text', e.target.value);
+        const handleTextareaEvent = () => {
+          if (textAreaRef.current) setCursorPosition(textAreaRef.current.selectionStart);
+        };
+        const handleSplitClick = () => {
+          if (cursorPosition > 0 && cursorPosition < entry.text.length) onSplit(entry.index, cursorPosition);
+        };
+        const handleTimeKeyDown = (e, field) => {
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+          e.preventDefault();
+          const currentValue = entry[field];
+          const ms = timestampToMs(currentValue);
+          const increment = e.shiftKey ? 1000 : 100;
+          const newMs = e.key === 'ArrowUp' ? ms + increment : ms - increment;
+          const newTimestamp = msToTimestamp(newMs);
+          onUpdate(entry.index, field, newTimestamp);
+        };
+
+        const containerClasses = [
+          "bg-gray-900/70", "rounded-lg", "p-3", "flex", "gap-3", "items-start", "transition-all", "duration-200", "cursor-pointer", "border",
+          isDragging ? "opacity-30" : "opacity-100",
+          isDragOver ? "border-teal-500 ring-2 ring-teal-500" :
+          isActive ? "border-blue-500 ring-2 ring-blue-500" :
+          isCurrent ? "border-teal-700 bg-teal-900/30" :
+          "border-transparent hover:bg-gray-800/90",
+        ].filter(Boolean).join(" ");
+        
+        const TimeInput = ({ field, value }) => CE('div', { className: "relative group" },
+          CE('input', { type: "text", value, onChange: (e) => handleTimeChange(e, field), onBlur: () => handleTimeBlur(field), onKeyDown: (e) => handleTimeKeyDown(e, field), className: "w-full bg-gray-700 font-mono text-sm p-1 rounded border border-gray-600 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none pr-7", "aria-label": `${field === 'startTime' ? 'Start' : 'End'} time for entry ${entry.index}. Use Arrow keys to adjust.`, title: "Use Arrow Up/Down to adjust by 100ms. Hold Shift for 1s." }),
+          CE('button', { onClick: () => onSetTimeToCurrent(entry.index, field), className: "absolute right-0 top-0 h-full px-1.5 flex items-center text-gray-400 hover:text-teal-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity", title: "Set to video's current time", "aria-label": `Set ${field === 'startTime' ? 'start' : 'end'} time to video's current time` },
+            CE(TargetIcon, { className: "w-4 h-4" })
+          )
+        );
+
+        return CE('div', { className: containerClasses, onClick, onContextMenu, draggable: true, onDragStart: (e) => onDragStart(e, index), onDragOver: (e) => onDragOver(e, index), onDrop: (e) => onDrop(e, index), onDragEnd },
+          CE('div', { className: "flex-shrink-0 cursor-move pt-1", title: "Drag to reorder" },
+            CE(GripVerticalIcon, { className: "w-5 h-5 text-gray-500" })
+          ),
+          CE('div', { className: "flex-grow" },
+            CE('div', { className: "flex items-center gap-2 mb-2 w-full max-w-sm" },
+              CE('span', { className: "font-mono text-xs text-gray-500 select-none w-6 text-center" }, entry.index),
+              CE('div', { className: "flex-1" }, CE(TimeInput, { field: "startTime", value: startTime })),
+              CE('span', { className: "text-gray-500" }, "→"),
+              CE('div', { className: "flex-1" }, CE(TimeInput, { field: "endTime", value: endTime }))
+            ),
+            CE('textarea', { ref: textAreaRef, value: entry.text, onChange: handleTextChange, onKeyUp: handleTextareaEvent, onMouseUp: handleTextareaEvent, onFocus: handleTextareaEvent, className: "w-full bg-gray-800 p-2 rounded border border-gray-600 resize-y min-h-[4rem] focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none", rows: 2, "aria-label": `Text for entry ${entry.index}` }),
+            isActive && CE('div', { className: "mt-2" },
+              CE('button', { onClick: handleSplitClick, disabled: cursorPosition === 0 || cursorPosition >= entry.text.length, className: "flex items-center gap-1.5 px-2 py-1 text-xs bg-gray-600 hover:bg-indigo-600 rounded-md transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed", title: "Split subtitle at cursor position" },
+                CE(ScissorsIcon, { className: "w-4 h-4" }),
+                "Split Line"
+              )
+            )
+          )
+        );
+      };
+      
+      // ** components/ContextMenu.tsx **
+      const ContextMenu = ({ x, y, entry, isFirst, isLast, onClose, onMove, onInsert, onMerge, onDelete }) => {
+          const menuRef = useRef(null);
+          const [position, setPosition] = useState({ top: y, left: x });
+          useLayoutEffect(() => {
+              if (menuRef.current) {
+                  const { innerHeight } = window;
+                  const { offsetHeight } = menuRef.current;
+                  let finalTop = y;
+                  if (y + offsetHeight > innerHeight) finalTop = y - offsetHeight;
+                  if (finalTop < 0) finalTop = 5;
+                  setPosition({ top: finalTop, left: x });
+              }
+          }, [x, y]);
+          useEffect(() => {
+              const handleClickOutside = (event) => {
+                  if (menuRef.current && !menuRef.current.contains(event.target)) onClose();
+              };
+              setTimeout(() => { document.addEventListener('click', handleClickOutside); }, 0);
+              return () => { document.removeEventListener('click', handleClickOutside); };
+          }, [onClose]);
+          const handleAction = (action) => {
+              action();
+              onClose();
+          };
+          const MenuItem = ({ label, icon, onClick, disabled = false, className = '' }) => CE('button', { onClick: disabled ? undefined : () => handleAction(onClick), disabled, className: `w-full flex items-center px-4 py-2 text-sm text-left transition-colors duration-150 ${disabled ? 'text-gray-500 cursor-not-allowed' : 'text-gray-200 hover:bg-gray-700'} ${className}` },
+              CE('span', { className: "mr-3" }, icon),
+              label
+          );
+          return CE('div', { ref: menuRef, style: { position: 'fixed', top: position.top, left: position.left, zIndex: 50 }, className: "w-56 bg-gray-800 border border-gray-700 rounded-md shadow-lg py-1" },
+              CE(MenuItem, { label: "Move Up", icon: CE(ArrowUpIcon, { className: "w-4 h-4" }), onClick: () => onMove(entry.index, 'up'), disabled: isFirst }),
+              CE(MenuItem, { label: "Move Down", icon: CE(ArrowDownIcon, { className: "w-4 h-4" }), onClick: () => onMove(entry.index, 'down'), disabled: isLast }),
+              CE('div', { className: "border-t border-gray-700 my-1" }),
+              CE(MenuItem, { label: "Insert Line Below", icon: CE(PlusIcon, { className: "w-4 h-4" }), onClick: () => onInsert(entry.index) }),
+              CE(MenuItem, { label: "Merge with Next", icon: CE(ChevronDoubleDownIcon, { className: "w-4 h-4" }), onClick: () => onMerge(entry.index), disabled: isLast }),
+              CE('div', { className: "border-t border-gray-700 my-1" }),
+              CE(MenuItem, { label: "Delete", icon: CE(TrashIcon, { className: "w-4 h-4" }), onClick: () => onDelete(entry.index), className: "text-red-400 hover:bg-red-800/50" })
+          );
+      };
+
+      // ** components/SrtDisplay.tsx **
+      const SrtDisplay = ({ entries, setEntries, isRefining, onSetTimeToCurrent, currentTime, onEntryClick, activeIndex, setActiveIndex }) => {
+        const [contextMenu, setContextMenu] = useState(null);
+        const [draggedIndex, setDraggedIndex] = useState(null);
+        const [dragOverIndex, setDragOverIndex] = useState(null);
+        const scrollContainerRef = useRef(null);
+        const listContainerRef = useRef(null);
+        const previousCurrentIndexRef = useRef(null);
+        const usePrevious = (value) => {
+          const ref = useRef();
+          useEffect(() => { ref.current = value; }, [value]);
+          return ref.current;
+        };
+        const prevEntriesLength = usePrevious(entries.length);
+        const justInsertedInMiddleRef = useRef(false);
+
+        useEffect(() => {
+          const currentTimeMs = currentTime * 1000;
+          const currentIndex = entries.findIndex(entry => {
+              const startTimeMs = timestampToMs(entry.startTime);
+              const endTimeMs = timestampToMs(entry.endTime);
+              return currentTimeMs >= startTimeMs && currentTimeMs < endTimeMs;
+          });
+          if (currentIndex !== -1 && currentIndex !== previousCurrentIndexRef.current) {
+            const list = listContainerRef.current;
+            if (list && list.children[currentIndex]) {
+              list.children[currentIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+          previousCurrentIndexRef.current = currentIndex;
+        }, [currentTime, entries]);
+
+        useEffect(() => {
+            if (justInsertedInMiddleRef.current) {
+                justInsertedInMiddleRef.current = false;
+                return;
+            }
+            if (prevEntriesLength !== undefined && entries.length > prevEntriesLength) {
+                const container = scrollContainerRef.current;
+                if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+            }
+        }, [entries.length, prevEntriesLength]);
+
+        const handleUpdate = (index, field, value) => {
+          setEntries(currentEntries =>
+            currentEntries.map(entry =>
+              entry.index === index ? { ...entry, [field]: value } : entry
+            )
+          );
+        };
+        const handleDelete = useCallback((index) => {
+          setEntries(currentEntries =>
+            currentEntries.filter(e => e.index !== index).map((e, i) => ({ ...e, index: i + 1 }))
+          );
+        }, [setEntries]);
+        const handleMove = useCallback((originalIndex, direction) => {
+          setEntries(currentEntries => {
+            const arrayIndex = currentEntries.findIndex(e => e.index === originalIndex);
+            if (arrayIndex === -1) return currentEntries;
+            const newEntries = [...currentEntries];
+            const targetIndex = direction === 'up' ? arrayIndex - 1 : arrayIndex + 1;
+            if (targetIndex >= 0 && targetIndex < newEntries.length) {
+              [newEntries[arrayIndex], newEntries[targetIndex]] = [newEntries[targetIndex], newEntries[arrayIndex]];
+              return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
+            }
+            return currentEntries;
+          });
+        }, [setEntries]);
+        const handleInsert = useCallback((afterIndex) => {
+          justInsertedInMiddleRef.current = true;
+          setEntries(currentEntries => {
+            const insertAtIndex = currentEntries.findIndex(e => e.index === afterIndex);
+            if (insertAtIndex === -1) return currentEntries;
+            const previousEntry = currentEntries[insertAtIndex];
+            const newEntry = { index: 0, startTime: previousEntry.endTime, endTime: previousEntry.endTime, text: 'New subtitle' };
+            const newEntries = [...currentEntries];
+            newEntries.splice(insertAtIndex + 1, 0, newEntry);
+            return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
+          });
+        }, [setEntries]);
+        const handleMerge = useCallback((indexToMerge) => {
+          setEntries(currentEntries => {
+            const mergeArrayIndex = currentEntries.findIndex(e => e.index === indexToMerge);
+            if (mergeArrayIndex === -1 || mergeArrayIndex >= currentEntries.length - 1) return currentEntries;
+            const entry1 = currentEntries[mergeArrayIndex];
+            const entry2 = currentEntries[mergeArrayIndex + 1];
+            const mergedEntry = { ...entry1, endTime: entry2.endTime, text: `${entry1.text}\n${entry2.text}`.trim() };
+            const newEntries = [...currentEntries];
+            newEntries[mergeArrayIndex] = mergedEntry;
+            newEntries.splice(mergeArrayIndex + 1, 1);
+            return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
+          });
+        }, [setEntries]);
+        const handleSplit = useCallback((indexToSplit, splitAt) => {
+          justInsertedInMiddleRef.current = true;
+          setEntries(currentEntries => {
+            const arrayIndex = currentEntries.findIndex(e => e.index === indexToSplit);
+            if (arrayIndex === -1) return currentEntries;
+            const originalEntry = currentEntries[arrayIndex];
+            const originalText = originalEntry.text;
+            if (splitAt <= 0 || splitAt >= originalText.length) return currentEntries;
+            const text1 = originalText.substring(0, splitAt).trim();
+            const text2 = originalText.substring(splitAt).trim();
+            if (!text1 || !text2) return currentEntries;
+            const startTimeMs = timestampToMs(originalEntry.startTime);
+            const endTimeMs = timestampToMs(originalEntry.endTime);
+            const durationMs = endTimeMs - startTimeMs;
+            let splitTimeMs = startTimeMs;
+            if (durationMs > 0) {
+              splitTimeMs = startTimeMs + Math.round(durationMs * (splitAt / originalText.length));
+            }
+            const updatedOriginalEntry = { ...originalEntry, endTime: msToTimestamp(splitTimeMs), text: text1 };
+            const newEntry = { index: 0, startTime: msToTimestamp(splitTimeMs), endTime: originalEntry.endTime, text: text2 };
+            const newEntries = [...currentEntries];
+            newEntries.splice(arrayIndex + 1, 0, newEntry);
+            newEntries[arrayIndex] = updatedOriginalEntry;
+            return newEntries.map((e, i) => ({ ...e, index: i + 1 }));
+          });
+        }, [setEntries]);
+        const handleContextMenu = (e, entry, isFirst, isLast) => {
+          e.preventDefault();
+          setContextMenu({ x: e.clientX, y: e.clientY, entry, isFirst, isLast });
+        };
+        const closeContextMenu = () => setContextMenu(null);
+        const handleDragStart = (e, index) => {
+          setDraggedIndex(index);
+          e.dataTransfer.effectAllowed = 'move';
+        };
+        const handleDragOver = (e, index) => {
+          e.preventDefault();
+          if (draggedIndex === null || draggedIndex === index) return;
+          setDragOverIndex(index);
+        };
+        const handleDrop = (e, dropIndex) => {
+          e.preventDefault();
+          if (draggedIndex === null) return;
+          setEntries(currentEntries => {
+            const newEntries = [...currentEntries];
+            const [draggedItem] = newEntries.splice(draggedIndex, 1);
+            newEntries.splice(dropIndex, 0, draggedItem);
+            return newEntries.map((entry, i) => ({ ...entry, index: i + 1 }));
+          });
+        };
+        const handleDragEnd = () => {
+          setDraggedIndex(null);
+          setDragOverIndex(null);
+        };
+
+        const allControlsDisabled = isRefining;
+
+        return CE('div', { className: "flex flex-col relative flex-grow min-h-0", onClick: contextMenu ? closeContextMenu : undefined },
+          isRefining && CE('div', { className: "absolute inset-0 z-30 rounded-lg" }, CE(Loader, { message: "Refining timings..." })),
+          contextMenu && CE(ContextMenu, { x: contextMenu.x, y: contextMenu.y, entry: contextMenu.entry, isFirst: contextMenu.isFirst, isLast: contextMenu.isLast, onClose: closeContextMenu, onDelete: handleDelete, onInsert: handleInsert, onMerge: handleMerge, onMove: handleMove }),
+          CE('div', { ref: scrollContainerRef, className: `p-2 transition-all flex-grow min-h-0 overflow-y-auto ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`, onClick: () => setActiveIndex(null) },
+            CE('div', { className: "space-y-2", ref: listContainerRef },
+              entries.map((entry, idx) => {
+                const currentTimeMs = currentTime * 1000;
+                const startTimeMs = timestampToMs(entry.startTime);
+                const endTimeMs = timestampToMs(entry.endTime);
+                const isCurrent = currentTimeMs >= startTimeMs && currentTimeMs < endTimeMs;
+                return CE(SrtEntry, {
+                  key: entry.index,
+                  entry: entry,
+                  isFirst: idx === 0,
+                  isLast: idx === entries.length - 1,
+                  onUpdate: handleUpdate,
+                  onSetTimeToCurrent: onSetTimeToCurrent,
+                  onContextMenu: (e) => handleContextMenu(e, entry, idx === 0, idx === entries.length - 1),
+                  onSplit: handleSplit,
+                  isActive: activeIndex === entry.index,
+                  isCurrent: isCurrent,
+                  onClick: (e) => { e.stopPropagation(); onEntryClick(entry); },
+                  index: idx,
+                  isDragging: draggedIndex === idx,
+                  isDragOver: dragOverIndex === idx,
+                  onDragStart: handleDragStart,
+                  onDragOver: handleDragOver,
+                  onDrop: handleDrop,
+                  onDragEnd: handleDragEnd,
+                });
+              })
+            )
+          )
+        );
+      };
+
+      // ** App.tsx **
+      const useHistoryState = (initialState) => {
+          const [history, setHistory] = useState([initialState]);
+          const [currentIndex, setCurrentIndex] = useState(0);
+          const state = history[currentIndex];
+          const setState = useCallback((newState) => {
+              const nextState = typeof newState === 'function' ? newState(state) : newState;
+              if (JSON.stringify(nextState) === JSON.stringify(state)) return;
+              const newHistory = history.slice(0, currentIndex + 1);
+              newHistory.push(nextState);
+              setHistory(newHistory);
+              setCurrentIndex(newHistory.length - 1);
+          }, [history, currentIndex, state]);
+          const undo = useCallback(() => {
+              if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+          }, [currentIndex]);
+          const redo = useCallback(() => {
+              if (currentIndex < history.length - 1) setCurrentIndex(currentIndex + 1); // Fix: was currentIndex - 1
+          }, [currentIndex, history.length]);
+          const resetState = useCallback((newState) => {
+              setHistory([newState]);
+              setCurrentIndex(0);
+          }, []);
+          const canUndo = currentIndex > 0;
+          const canRedo = currentIndex < history.length - 1;
+          return { state, setState, undo, redo, canUndo, canRedo, resetState };
+      };
+
+      const MAX_FILE_SIZE_MB = 15;
+      const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+      
+      const App = () => {
+        const [videoFile, setVideoFile] = useState(null);
+        const [videoUrl, setVideoUrl] = useState(null);
+        const [lyrics, setLyrics] = useState('');
+        const { state: srtEntries, setState: setSrtEntries, resetState: resetSrtEntries, undo, redo, canUndo, canRedo } = useHistoryState([]);
+        const [offset, setOffset] = useState(0);
+        const [endTimePadding, setEndTimePadding] = useState(0);
+        const [activeProcess, setActiveProcess] = useState(null);
+        const [loadingMessage, setLoadingMessage] = useState('');
+        const [isRefining, setIsRefining] = useState(false);
+        const [error, setError] = useState(null);
+        const [draftToRestore, setDraftToRestore] = useState(null);
+        const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
+        const [currentTime, setCurrentTime] = useState(0);
+        const [activeIndex, setActiveIndex] = useState(null);
+        const [importedFileName, setImportedFileName] = useState(null);
+
+        const videoRef = useRef(null);
+        const downloadMenuRef = useRef(null);
+        const subtitleInputRef = useRef(null);
+        const isLoading = activeProcess !== null;
+
+        useEffect(() => {
+          try {
+            const savedDraftJSON = localStorage.getItem('srtLyricSyncDraft');
+            if (savedDraftJSON) {
+              const savedDraft = JSON.parse(savedDraftJSON);
+              if (savedDraft.entries && Array.isArray(savedDraft.entries) && savedDraft.entries.length > 0) {
+                if (typeof savedDraft.offset === 'undefined') savedDraft.offset = 0;
+                if (typeof savedDraft.endTimePadding === 'undefined') savedDraft.endTimePadding = 0;
+                setDraftToRestore(savedDraft);
+              }
+            }
+          } catch (e) {
+            console.error("Failed to load or parse draft from localStorage", e);
+            localStorage.removeItem('srtLyricSyncDraft');
+          }
+        }, []);
+
+        useEffect(() => {
+          const userLang = navigator.language || (navigator.languages && navigator.languages[0]);
+          if (userLang) console.log(`SRT Lyric Sync: User browser language detected - ${userLang}`);
+        }, []);
+
+        useEffect(() => {
+          if (isLoading || isRefining) return;
+          const handler = setTimeout(() => {
+            if (srtEntries.length > 0) {
+              const draft = { entries: srtEntries, videoFileName: videoFile?.name || null, timestamp: new Date().toISOString(), offset: offset, endTimePadding: endTimePadding };
+              localStorage.setItem('srtLyricSyncDraft', JSON.stringify(draft));
+            } else {
+              localStorage.removeItem('srtLyricSyncDraft');
+            }
+          }, 1500);
+          return () => clearTimeout(handler);
+        }, [srtEntries, videoFile, isLoading, isRefining, offset, endTimePadding]);
+
+        useEffect(() => {
+          if (!videoFile) {
+            if (videoUrl) URL.revokeObjectURL(videoUrl);
+            setVideoUrl(null);
+            return;
+          }
+          const objectUrl = URL.createObjectURL(videoFile);
+          setVideoUrl(objectUrl);
+          return () => URL.revokeObjectURL(objectUrl);
+        }, [videoFile]);
+
+        useEffect(() => {
+          const handleKeyDown = (event) => {
+            if (!videoRef.current || isLoading || isRefining) return;
+            const activeElement = document.activeElement;
+            const isTyping = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable);
+            if (event.code === 'Space' && !isTyping) {
+              event.preventDefault();
+              if (videoRef.current.paused) videoRef.current.play();
+              else videoRef.current.pause();
+            }
+          };
+          window.addEventListener('keydown', handleKeyDown);
+          return () => window.removeEventListener('keydown', handleKeyDown);
+        }, [isLoading, isRefining]);
+
+        useEffect(() => {
+          const handleClickOutside = (event) => {
+            if (downloadMenuRef.current && !downloadMenuRef.current.contains(event.target)) setIsDownloadMenuOpen(false);
+          };
+          document.addEventListener("mousedown", handleClickOutside);
+          return () => document.removeEventListener("mousedown", handleClickOutside);
+        }, [downloadMenuRef]);
+
+        const handleTranscribe = useCallback(async () => {
+          if (!videoFile) {
+            setError("Please upload a media file before transcribing.");
+            return;
+          }
+          setActiveProcess('transcribe');
+          setError(null);
+          resetSrtEntries([]);
+          setOffset(0);
+          setEndTimePadding(0);
+          setImportedFileName(null);
+          try {
+            setLoadingMessage("Step 1/3: Transcribing audio...");
+            const videoBase64 = await fileToBase64(videoFile);
+            const transcribedText = await transcribeAudio(videoBase64, videoFile.type);
+            setLyrics(transcribedText);
+            setLoadingMessage("Step 2/3: Analyzing audio & syncing lyrics...");
+            const initialSrtData = await generateSrtFromVideoAndLyrics(videoBase64, videoFile.type, transcribedText);
+            setLoadingMessage("Step 3/3: Refining timings for accuracy...");
+            const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
+            resetSrtEntries(refinedSrtData);
+            const updatedLyrics = refinedSrtData.map(entry => entry.text).join('\n');
+            setLyrics(updatedLyrics);
+          } catch (e) {
+            console.error(e);
+            const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+            setError(`Failed to process: ${errorMessage}`);
+          } finally {
+            setActiveProcess(null);
+            setLoadingMessage('');
+          }
+        }, [videoFile, resetSrtEntries, setLyrics]);
+
+        const handleFileSelect = useCallback((file) => {
+          if (!file) {
+            setVideoFile(null);
+            return;
+          }
+          if (file.size > MAX_FILE_SIZE_BYTES) {
+            setError(`File is too large. Please select a file smaller than ${MAX_FILE_SIZE_MB}MB.`);
+            setVideoFile(null);
+            return;
+          }
+          setError(null);
+          setVideoFile(file);
+        }, []);
+
+        const handleGenerateSrt = useCallback(async (lyricsToGenerate) => {
+          if (!videoFile) {
+            setError("Please upload a media file before generating subtitles.");
+            return;
+          }
+          if (!lyricsToGenerate.trim()) {
+            setError("Lyrics are empty. Please provide lyrics to generate subtitles.");
+            return;
+          }
+          setActiveProcess('generate');
+          setError(null);
+          resetSrtEntries([]);
+          setOffset(0);
+          setEndTimePadding(0);
+          try {
+            setLoadingMessage("Step 1/2: Analyzing audio & syncing lyrics...");
+            const videoBase64 = await fileToBase64(videoFile);
+            const initialSrtData = await generateSrtFromVideoAndLyrics(videoBase64, videoFile.type, lyricsToGenerate);
+            setLoadingMessage("Step 2/2: Refining timings for accuracy...");
+            const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
+            resetSrtEntries(refinedSrtData);
+            const updatedLyrics = refinedSrtData.map(entry => entry.text).join('\n');
+            setLyrics(updatedLyrics);
+          } catch (e) {
+            console.error(e);
+            const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+            setError(`Failed to process: ${errorMessage}`);
+          } finally {
+            setActiveProcess(null);
+            setLoadingMessage('');
+          }
+        }, [videoFile, resetSrtEntries, setLyrics]);
+
+        const handleGenerate = useCallback(() => {
+          setImportedFileName(null);
+          handleGenerateSrt(lyrics);
+        }, [lyrics, handleGenerateSrt]);
+
+        const handleRefineTimings = useCallback(async () => {
+          if (!videoFile) {
+            setError("Please upload the media file to use the refine feature.");
+            return;
+          }
+          if (srtEntries.length === 0) {
+            setError("There are no subtitles to refine.");
+            return;
+          }
+          setIsRefining(true);
+          setError(null);
+          try {
+            const videoBase64 = await fileToBase64(videoFile);
+            const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, srtEntries);
+            setSrtEntries(refinedSrtData);
+            setOffset(0);
+            setEndTimePadding(0);
+          } catch (e) {
+            console.error(e);
+            const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+            setError(`Failed to refine timings: ${errorMessage}`);
+          } finally {
+            setIsRefining(false);
+          }
+        }, [videoFile, srtEntries, setSrtEntries]);
+
+        const handleOffsetChange = (newOffsetValue) => {
+          const diff = newOffsetValue - offset;
+          if (diff === 0) return;
+          setSrtEntries(currentEntries => currentEntries.map(entry => {
+            const newStartTime = timestampToMs(entry.startTime) + diff;
+            const newEndTime = timestampToMs(entry.endTime) + diff;
+            return { ...entry, startTime: msToTimestamp(newStartTime), endTime: msToTimestamp(newEndTime) };
+          }));
+          setOffset(newOffsetValue);
+        };
+        const handleEndTimePaddingChange = (newPadding) => {
+          const diff = newPadding - endTimePadding;
+          if (diff === 0) return;
+          setSrtEntries(currentEntries => currentEntries.map((entry, index) => {
+            const startTimeMs = timestampToMs(entry.startTime);
+            let newEndTimeMs = timestampToMs(entry.endTime) + diff;
+            newEndTimeMs = Math.max(startTimeMs, newEndTimeMs);
+            const isIncreasingPadding = diff > 0;
+            const hasNextEntry = index < currentEntries.length - 1;
+            if (isIncreasingPadding && hasNextEntry) {
+              const nextEntryStartTimeMs = timestampToMs(currentEntries[index + 1].startTime);
+              newEndTimeMs = Math.min(newEndTimeMs, nextEntryStartTimeMs);
+            }
+            return { ...entry, endTime: msToTimestamp(newEndTimeMs) };
+          }));
+          setEndTimePadding(newPadding);
+        };
+        const handleSetTimeToCurrent = (entryIndex, field) => {
+          if (!videoRef.current) return;
+          const currentTimeMs = videoRef.current.currentTime * 1000;
+          setSrtEntries(currentEntries => {
+            const entryArrayIndex = currentEntries.findIndex(e => e.index === entryIndex);
+            if (entryArrayIndex === -1) return currentEntries;
+            const newEntries = [...currentEntries];
+            const entryToUpdate = newEntries[entryArrayIndex];
+            if (field === 'startTime') {
+              const durationMs = Math.max(0, timestampToMs(entryToUpdate.endTime) - timestampToMs(entryToUpdate.startTime));
+              let newStartTimeMs = currentTimeMs;
+              if (entryArrayIndex > 0) newStartTimeMs = Math.max(newStartTimeMs, timestampToMs(newEntries[entryArrayIndex - 1].endTime));
+              let newEndTimeMs = newStartTimeMs + durationMs;
+              if (entryArrayIndex < newEntries.length - 1) {
+                const nextEntryStartTimeMs = timestampToMs(newEntries[entryArrayIndex + 1].startTime);
+                newEndTimeMs = Math.min(newEndTimeMs, nextEntryStartTimeMs);
+                if (newStartTimeMs > newEndTimeMs) newStartTimeMs = newEndTimeMs;
+              }
+              newEntries[entryArrayIndex] = { ...entryToUpdate, startTime: msToTimestamp(newStartTimeMs), endTime: msToTimestamp(newEndTimeMs) };
+            } else {
+              let newEndTimeMs = currentTimeMs;
+              const currentStartTimeMs = timestampToMs(entryToUpdate.startTime);
+              newEndTimeMs = Math.max(newEndTimeMs, currentStartTimeMs);
+              if (entryArrayIndex < newEntries.length - 1) {
+                const nextEntryStartTimeMs = timestampToMs(newEntries[entryArrayIndex + 1].startTime);
+                newEndTimeMs = Math.min(newEndTimeMs, nextEntryStartTimeMs);
+              }
+              newEntries[entryArrayIndex] = { ...entryToUpdate, endTime: msToTimestamp(newEndTimeMs) };
+            }
+            return newEntries;
+          });
+        };
+        const handleEntryClick = (entry) => {
+          if (videoRef.current) {
+            const seekTime = timestampToMs(entry.startTime) / 1000;
+            videoRef.current.currentTime = seekTime;
+            videoRef.current.play();
+          }
+          setActiveIndex(entry.index);
+        };
+        const handleRestoreDraft = () => {
+          if (draftToRestore) {
+            resetSrtEntries(draftToRestore.entries);
+            setOffset(draftToRestore.offset || 0);
+            setEndTimePadding(draftToRestore.endTimePadding || 0);
+            setImportedFileName(null);
+            setError("Draft restored. Please re-upload the original media file to use the preview and refine functions.");
+            setTimeout(() => setError(null), 6000);
+          }
+          setDraftToRestore(null);
+        };
+        const handleDismissDraft = () => {
+          localStorage.removeItem('srtLyricSyncDraft');
+          setDraftToRestore(null);
+        };
+        const handleImportSubtitles = (file) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const content = e.target?.result;
+            if (!content) {
+              setError('File is empty or could not be read.');
+              return;
+            }
+            try {
+              const extension = file.name.split('.').pop()?.toLowerCase();
+              if (extension === 'txt') {
+                setError(null);
+                setLyrics(content);
+                setImportedFileName(file.name);
+                resetSrtEntries([]);
+                setOffset(0);
+                setEndTimePadding(0);
+                if (videoFile) handleGenerateSrt(content);
+                return;
+              }
+              let parsedEntries = [];
+              switch (extension) {
+                case 'srt': parsedEntries = parseSrt(content); break;
+                case 'vtt': parsedEntries = parseVtt(content); break;
+                case 'lrc': parsedEntries = parseLrc(content); break;
+                default: setError(`Unsupported file type: .${extension}`); return;
+              }
+              if (parsedEntries.length === 0) {
+                setError('No valid subtitle entries found in the file.');
+                return;
+              }
+              setError(null);
+              setLyrics('');
+              resetSrtEntries(parsedEntries);
+              setOffset(0);
+              setEndTimePadding(0);
+              setImportedFileName(file.name);
+            } catch (err) {
+              console.error('Error parsing subtitle file:', err);
+              const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+              setError(`Failed to parse file: ${errorMessage}`);
+              setImportedFileName(null);
+            }
+          };
+          reader.onerror = () => {
+            setError('Error reading the file.');
+            setImportedFileName(null);
+          };
+          reader.readAsText(file);
+        };
+        const handleImportClick = () => subtitleInputRef.current?.click();
+        const handleSubtitleFileChange = (e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleImportSubtitles(e.target.files[0]);
+            e.target.value = '';
+          }
+        };
+        const downloadFile = (content, fileName, mimeType) => {
+          const bom = '\uFEFF';
+          const blob = new Blob([bom + content], { type: `${mimeType};charset=utf-8` });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+        const handleDownload = (format) => {
+          const getBaseName = () => videoFile?.name.substring(0, videoFile.name.lastIndexOf('.')) || importedFileName?.substring(0, importedFileName.lastIndexOf('.')) || 'lyrics';
+          const baseName = getBaseName();
+          let content = '', fileName = '', mimeType = 'text/plain';
+          switch (format) {
+            case 'srt': content = serializeSrt(srtEntries); fileName = `${baseName}.srt`; break;
+            case 'vtt': content = srtToVtt(serializeSrt(srtEntries)); fileName = `${baseName}.vtt`; mimeType = 'text/vtt'; break;
+            case 'lrc': content = serializeLrc(srtEntries); fileName = `${baseName}.lrc`; break;
+          }
+          downloadFile(content, fileName, mimeType);
+          setIsDownloadMenuOpen(false);
+        };
+
+        const allControlsDisabled = isRefining || isLoading;
+        const canGenerate = videoFile !== null && lyrics.trim().length > 0 && !allControlsDisabled;
+        const canTranscribe = videoFile !== null && !allControlsDisabled;
+        const isAudio = videoFile?.type.startsWith('audio/');
+        const uploadBoxTitle = videoFile ? (isAudio ? '1. Preview Audio' : '1. Preview Video') : '1. Upload Video or Audio';
+        const containerClasses = 'bg-gray-900 text-white font-sans flex flex-col min-h-screen lg:h-screen lg:overflow-hidden';
+
+        return CE('div', { className: containerClasses },
+          draftToRestore && CE('div', { className: "bg-gray-800 border-b border-teal-800 text-center p-3 flex justify-center items-center gap-4 text-sm shadow-lg flex-shrink-0" },
+            CE(ArchiveBoxIcon, { className: "w-6 h-6 text-teal-400 flex-shrink-0" }),
+            CE('p', { className: "text-gray-300" }, "Found an unsaved draft", draftToRestore.videoFileName && CE('span', { className: "font-semibold text-white" }, ` for "${draftToRestore.videoFileName}"`), ". Would you like to restore it?"),
+            CE('button', { onClick: handleRestoreDraft, className: "px-4 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-md font-semibold transition-colors" }, "Restore"),
+            CE('button', { onClick: handleDismissDraft, className: "px-4 py-1.5 hover:bg-gray-700 rounded-md text-gray-400 hover:text-white transition-colors" }, "Dismiss")
+          ),
+          CE('main', { className: "max-w-7xl mx-auto w-full flex flex-col flex-grow p-4 min-h-0" },
+            CE('header', { className: "text-center my-3 flex-shrink-0" },
+              CE('h1', { className: "text-lg md:text-xl font-semibold tracking-tight text-gray-300 flex flex-wrap justify-center items-center gap-x-2 px-2" },
+                CE('span', { className: "font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500" }, "SRT Lyric Sync"),
+                CE('span', { className: "text-xs md:text-sm text-gray-400 font-normal" }, "Automatically generate synchronized subtitles for your music videos.")
+              )
+            ),
+            CE('div', { className: "grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch flex-grow min-h-0" },
+              CE('div', { className: "lg:col-span-2 flex flex-col gap-6 min-h-0" },
+                CE('div', { className: "p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col min-h-0" },
+                  CE('div', { className: "flex items-baseline mb-4" },
+                    CE('h2', { className: "text-lg font-semibold text-gray-200 flex-shrink-0" }, uploadBoxTitle),
+                    videoFile && CE('span', { className: "text-sm text-gray-400 truncate ml-4", title: videoFile.name }, videoFile.name)
+                  ),
+                  CE(FileUpload, { videoFile, setVideoFile: handleFileSelect, disabled: allControlsDisabled, videoUrl })
+                ),
+                CE('div', { className: "p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col flex-grow min-h-0" },
+                  CE('div', { className: "flex justify-between items-center mb-4 flex-wrap gap-y-2" },
+                    CE('h2', { className: "text-lg font-semibold text-gray-200" }, "2. Provide Lyrics"),
+                    CE('div', { className: "flex items-center gap-2" },
+                      CE('button', { onClick: handleImportClick, disabled: allControlsDisabled, className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed", title: "Import subtitles from a file (.srt, .vtt, .lrc, .txt)" }, CE(UploadIcon, { className: "w-5 h-5" }), "Import"),
+                      CE('input', { type: "file", ref: subtitleInputRef, onChange: handleSubtitleFileChange, accept: ".srt,.vtt,.lrc,.txt", className: "hidden", disabled: allControlsDisabled }),
+                      CE('button', { onClick: handleTranscribe, disabled: !canTranscribe, className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed", title: "Transcribe audio and generate subtitles in one step" }, CE(MicrophoneIcon, { className: "w-5 h-5" }), activeProcess === 'transcribe' ? 'Processing...' : 'Transcribe'),
+                      CE('button', { onClick: handleGenerate, disabled: !canGenerate, className: "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out bg-teal-600 hover:bg-teal-500 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none" }, CE(SparklesIcon, { className: "w-5 h-5" }), activeProcess === 'generate' ? 'Generating...' : 'Generate')
+                    )
+                  ),
+                  CE(LyricsInput, { lyrics, setLyrics, disabled: allControlsDisabled })
+                )
+              ),
+              CE('div', { className: "lg:col-span-3 p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col gap-4 min-h-0 h-screen lg:h-auto" },
+                CE('div', { className: "flex justify-between items-center flex-wrap gap-2" },
+                  CE('div', { className: "flex items-baseline min-w-0" },
+                    CE('h2', { className: "text-lg font-semibold text-gray-200 flex-shrink-0" }, "3. Edit Your Subtitles"),
+                    importedFileName && CE('span', { className: "text-sm text-gray-400 truncate ml-4", title: importedFileName }, importedFileName)
+                  ),
+                  CE('div', { className: "flex items-center space-x-2" },
+                    CE('div', { className: "flex items-center", role: "group" },
+                      CE('button', { onClick: undo, disabled: !canUndo || allControlsDisabled, className: "p-2 rounded-l-md bg-gray-700 hover:bg-gray-600 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: "Undo" }, CE(UndoIcon, { className: "w-5 h-5" })),
+                      CE('button', { onClick: redo, disabled: !canRedo || allControlsDisabled, className: "p-2 rounded-r-md bg-gray-700 hover:bg-gray-600 border-l border-gray-800 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: "Redo" }, CE(RedoIcon, { className: "w-5 h-5" }))
+                    ),
+                    CE('button', { onClick: handleRefineTimings, disabled: allControlsDisabled, className: "flex items-center p-2 sm:px-3 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed", title: "Use AI to improve timing accuracy" }, CE(SparklesIcon, { className: "w-5 h-5 sm:mr-2" }), CE('span', { className: "hidden sm:inline" }, "Refine")),
+                    CE('div', { className: "relative inline-flex shadow-md", ref: downloadMenuRef },
+                      CE('button', { onClick: () => handleDownload('srt'), disabled: srtEntries.length === 0 || allControlsDisabled, className: "flex items-center p-2 sm:px-3 sm:py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-l-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed", title: "Download SRT file" }, CE(DownloadIcon, { className: "w-5 h-5 sm:mr-2" }), CE('span', { className: "hidden sm:inline" }, "Download SRT")),
+                      CE('button', { onClick: () => setIsDownloadMenuOpen(prev => !prev), disabled: srtEntries.length === 0 || allControlsDisabled, className: "p-2 sm:px-1.5 bg-teal-600 hover:bg-teal-500 rounded-r-md border-l border-teal-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed", title: "More download options" }, CE(ChevronDownIcon, { className: "w-5 h-5" })),
+                      isDownloadMenuOpen && CE('div', { className: "absolute right-0 top-full mt-2 w-40 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600 overflow-hidden" },
+                        CE('a', { onClick: () => handleDownload('vtt'), className: "block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer" }, "Download VTT"),
+                        CE('a', { onClick: () => handleDownload('lrc'), className: "block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer" }, "Download LRC")
+                      )
+                    )
+                  )
+                ),
+                CE('div', { className: "bg-gray-900/70 rounded-lg relative flex flex-col flex-grow min-h-0" },
+                  isLoading && CE(Loader, { message: loadingMessage }),
+                  !isLoading && error && CE('div', { className: "flex items-center justify-center h-full text-center text-red-400 p-4" }, CE('p', null, error)),
+                  !isLoading && !error && srtEntries.length > 0 && videoFile && videoUrl ? CE('div', { className: "flex flex-col flex-grow min-h-0" },
+                    CE('div', { className: "relative bg-black flex-shrink-0 border-b-2 border-gray-700/50 max-h-[35vh] p-2" }, CE(VideoPreview, { ref: videoRef, videoFile, videoUrl, entries: srtEntries, onTimeUpdate: setCurrentTime })),
+                    CE('div', { className: `p-3 bg-gray-900/50 border-b border-gray-700 transition-all flex-shrink-0 ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}` },
+                      CE('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4" },
+                        CE('div', { className: "flex-1 min-w-[280px]" },
+                          CE('label', { htmlFor: "timing-offset-slider", className: "block text-sm font-medium text-gray-300 mb-2" }, "Global Timing Offset"),
+                          CE('div', { className: "flex items-center gap-3" },
+                            CE('input', { id: "timing-offset-slider", type: "range", min: "-2000", max: "2000", step: "10", value: offset, onChange: (e) => handleOffsetChange(parseInt(e.target.value, 10)), className: "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50", disabled: allControlsDisabled, title: `${offset}ms` }),
+                            CE('input', { type: "number", value: offset, onChange: (e) => handleOffsetChange(parseInt(e.target.value, 10) || 0), className: "w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50", step: "10", "aria-label": "Timing offset in milliseconds", disabled: allControlsDisabled }),
+                            CE('button', { onClick: () => handleOffsetChange(0), disabled: offset === 0 || allControlsDisabled, className: "p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: "Reset offset" }, CE(ArrowPathIcon, { className: "w-5 h-5" }))
+                          )
+                        ),
+                        CE('div', { className: "flex-1 min-w-[280px]" },
+                          CE('label', { htmlFor: "end-time-padding-slider", className: "block text-sm font-medium text-gray-300 mb-2", title: "Adds a small delay to the end of each subtitle to account for vocal decay." }, "Vocal Decay Helper (End Time Padding)"),
+                          CE('div', { className: "flex items-center gap-3" },
+                            CE('input', { id: "end-time-padding-slider", type: "range", min: "-2000", max: "2000", step: "10", value: endTimePadding, onChange: (e) => handleEndTimePaddingChange(parseInt(e.target.value, 10)), className: "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50", disabled: allControlsDisabled, title: `${endTimePadding >= 0 ? '+' : ''}${endTimePadding}ms` }),
+                            CE('input', { type: "number", value: endTimePadding, onChange: (e) => handleEndTimePaddingChange(parseInt(e.target.value, 10) || 0), className: "w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50", step: "10", "aria-label": "End time padding in milliseconds", disabled: allControlsDisabled }),
+                            CE('button', { onClick: () => handleEndTimePaddingChange(0), disabled: endTimePadding === 0 || allControlsDisabled, className: "p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: "Reset padding" }, CE(ArrowPathIcon, { className: "w-5 h-5" }))
+                          )
+                        )
+                      )
+                    ),
+                    CE('div', { className: "flex-grow min-h-0 flex flex-col" }, CE(SrtDisplay, { entries: srtEntries, setEntries: setSrtEntries, isRefining, onSetTimeToCurrent: handleSetTimeToCurrent, currentTime, onEntryClick: handleEntryClick, activeIndex, setActiveIndex }))
+                  ) : (!isLoading && !error && srtEntries.length === 0 && CE('div', { className: "flex items-center justify-center h-full text-center text-gray-500 p-4" }, CE('p', null, "Your generated SRT file will appear here."))),
+                  !isLoading && !error && srtEntries.length > 0 && !videoFile && CE('div', { className: "flex flex-col items-center justify-center h-full text-center text-red-400 p-4" }, CE('p', { className: "font-semibold text-lg" }, "Media File Missing"), CE('p', { className: "mt-2 text-gray-300" }, "Please re-upload the original media file to edit and preview the subtitles."))
+                )
+              )
+            )
+          ),
+          CE('footer', { className: "text-center py-4 text-gray-500 text-sm flex-shrink-0" },
+            CE('p', null, "Powered by Google Gemini")
+          )
+        );
+      };
+
+      // --- End of inlined files ---
+
+      const rootElement = document.getElementById('root');
+      if (!rootElement) {
+        throw new Error("Could not find root element to mount to");
+      }
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(CE(React.StrictMode, null, CE(App)));
+    </script>
   </body>
 </html>
