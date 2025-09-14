@@ -9,28 +9,38 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 
 ## ✨ Features
 
-*   **AI-Powered Synchronization**: Upload your media file (video or audio) and provide the lyrics to get a perfectly synchronized subtitle file in seconds.
-*   **High-Precision AI Refinement**: Fine-tune the generated timings with a single click, leveraging AI to analyze vocal decay and phrasing for professional-grade accuracy.
+*   **AI-Powered Transcription & Sync**:
+    *   **One-Click Transcription**: Don't have the lyrics? Let the AI transcribe the audio for you directly into the editor and generate synchronized subtitles in a single step.
+    *   **Automatic Synchronization**: If you already have lyrics, just paste them in and let the AI create a perfectly synchronized subtitle file in seconds.
+*   **High-Precision AI Refinement**: Fine-tune generated timings with a single click. The AI analyzes vocal decay and phrasing for professional-grade accuracy.
 *   **Advanced Interactive Editor**:
     *   **One-Click Timestamping**: Click the target icon next to any time field to instantly set it to the video's current playback position.
-    *   **Drag & Drop**: Effortlessly reorder subtitle lines.
-    *   **Right-Click Menu**: Quickly insert new lines, merge with the next line, or delete.
-    *   **Split On-the-Fly**: Place your cursor in the text and click "Split" to instantly break a long line into two, with timings automatically calculated.
-    *   **Timestamp Keyboard Helper**: Use arrow keys in time fields for precise 100ms adjustments (or 1-second jumps with Shift). Play/pause the video with the spacebar when not typing.
+    *   **Drag & Drop Reordering**: Effortlessly reorder subtitle lines.
+    *   **Powerful Right-Click Menu**: Quickly insert new lines, merge with the next line, delete, or move lines up and down.
+    *   **On-the-Fly Splitting**: Place your cursor in the text and click the "Split Line" button to instantly break a long line into two, with timings automatically calculated.
+    *   **Keyboard Power-Ups**: Use arrow keys in time fields for precise 100ms adjustments (or 1-second jumps with Shift). Play/pause the video with the spacebar when not typing.
+    *   **Undo/Redo History**: Never lose an edit. Step backward and forward through your changes with ease.
 *   **Global Timing Controls**:
-    *   **Offset Slider**: Shift all timestamps forward or backward at once to perfectly align the entire subtitle track.
-    *   **Vocal Decay Helper**: Add a uniform padding to the end of each line to better match the natural fade-out of a singer's voice.
-*   **Real-time Video Preview**: See your edits reflected instantly on the custom video player. The subtitle list automatically scrolls to the currently playing line.
-*   **Flexible I/O**: Import lyrics from `.srt`, `.vtt`, and `.lrc` files, or paste raw text. Export your work to any of these formats with the streamlined download menu.
-*   **Draft Autosave**: Your progress is automatically saved in your browser, so you can pick up where you left off.
+    *   **Global Offset Slider**: Shift all timestamps forward or backward at once to perfectly align the entire subtitle track.
+    *   **Vocal Decay Helper**: Add uniform padding to the end of each line to better match the natural fade-out of a singer's voice.
+*   **Flexible I/O & Workflow**:
+    *   **Real-time Video Preview**: See your edits reflected instantly on the custom video player. The subtitle list automatically scrolls to the currently playing line.
+    *   **Multi-Format Support**: Import from `.txt`, `.srt`, `.vtt`, and `.lrc` files. Export your work to SRT, VTT, or LRC with the streamlined download menu.
+    *   **Draft Autosave & Restore**: Your progress is automatically saved in your browser. If you leave and come back, the app will offer to restore your unsaved draft.
+
 
 ## 🚀 How to Use
 
 1.  **Upload Media**: Drag and drop or select your video/audio file.
-2.  **Provide Lyrics**: Paste the lyrics or import an existing subtitle file.
-3.  **Generate**: Click the "Generate" button to let the AI create the initial synchronized subtitles.
-4.  **Edit & Refine**: Use the powerful editor to make any necessary adjustments. Use the "Refine" button for AI-assisted timing improvements.
-5.  **Download**: Export your synchronized subtitles in your desired format.
+2.  **Provide Lyrics**: You have three options:
+    *   **Transcribe (Recommended)**: Click **Transcribe** to let the AI generate lyrics and timings automatically in one step.
+    *   **Paste**: Paste the lyrics directly into the text area.
+    *   **Import**: Click **Import** to load lyrics from a `.txt` file or an existing subtitle file (`.srt`, `.vtt`, `.lrc`).
+3.  **Generate/Refine**:
+    *   If you pasted or imported lyrics, click **Generate** to create the initial timings.
+    *   Click **Refine** at any time to use the AI to improve the timing accuracy of your current subtitles.
+4.  **Edit**: Use the powerful interactive editor to make any final adjustments.
+5.  **Download**: Export your synchronized subtitles in your desired format (SRT, VTT, or LRC).
 
 ---
 

@@ -1,6 +1,6 @@
-[English](./README.md) | [日本語](./README.ja.md) | [简体中文](./README.zh-CN.md)
-
 # SRT Lyric Sync
+
+[English](./README.md) | [日本語](./README.ja.md) | [简体中文](./README.zh-CN.md)
 
 Sube un archivo de audio o un video con audio y proporciona la letra completa o un archivo SRT, VTT o LRC para generar automáticamente un archivo de subtítulos SRT, VTT o LRC sincronizado usando IA.
 
@@ -9,28 +9,37 @@ Sube un archivo de audio o un video con audio y proporciona la letra completa o 
 
 ## ✨ Características
 
-*   **Sincronización con IA**: Sube tu archivo multimedia (video o audio) y proporciona la letra para obtener un archivo de subtítulos perfectamente sincronizado en segundos.
-*   **Refinamiento de Alta Precisión con IA**: Afina los tiempos generados con un solo clic, aprovechando la IA para analizar el decaimiento vocal y el fraseo para una precisión de nivel profesional.
+*   **Transcripción y Sincronización con IA**:
+    *   **Transcripción con Un Clic**: ¿No tienes la letra? Deja que la IA transcriba el audio por ti directamente en el editor y genere subtítulos sincronizados en un solo paso.
+    *   **Sincronización Automática**: Si ya tienes la letra, simplemente pégala y deja que la IA cree un archivo de subtítulos perfectamente sincronizado en segundos.
+*   **Refinamiento de Alta Precisión con IA**: Afina los tiempos generados con un solo clic. La IA analiza el decaimiento vocal y el fraseo para una precisión de nivel profesional.
 *   **Editor Interactivo Avanzado**:
     *   **Marcado de Tiempo con Un Clic**: Haz clic en el icono de objetivo junto a cualquier campo de tiempo para establecerlo instantáneamente en la posición de reproducción actual del video.
-    *   **Arrastrar y Soltar**: Reordena las líneas de subtítulos sin esfuerzo.
-    *   **Menú Contextual (Clic Derecho)**: Inserta rápidamente nuevas líneas, fusiona con la siguiente línea o elimina.
-    *   **División al Vuelo**: Coloca el cursor en el texto y haz clic en "Dividir" para dividir instantáneamente una línea larga en dos, con los tiempos calculados automáticamente.
-    *   **Asistente de Teclado para Tiempos**: Usa las teclas de flecha en los campos de tiempo para ajustes precisos de 100ms (o saltos de 1 segundo con Shift). Reproduce/pausa el video con la barra espaciadora cuando no estés escribiendo.
+    *   **Reordenación por Arrastrar y Soltar**: Reordena las líneas de subtítulos sin esfuerzo.
+    *   **Potente Menú Contextual (Clic Derecho)**: Inserta rápidamente nuevas líneas, fusiona con la siguiente línea, elimina o mueve líneas hacia arriba y hacia abajo.
+    *   **División al Vuelo**: Coloca el cursor en el texto y haz clic en el botón "Dividir Línea" para dividir instantáneamente una línea larga en dos, con los tiempos calculados automáticamente.
+    *   **Atajos de Teclado**: Usa las teclas de flecha en los campos de tiempo para ajustes precisos de 100ms (o saltos de 1 segundo con Shift). Reproduce/pausa el video con la barra espaciadora cuando no estés escribiendo.
+    *   **Historial de Deshacer/Rehacer**: Nunca pierdas una edición. Avanza y retrocede a través de tus cambios con facilidad.
 *   **Controles de Sincronización Global**:
-    *   **Deslizador de Desplazamiento (Offset)**: Desplaza todos los tiempos hacia adelante o hacia atrás a la vez para alinear perfectamente toda la pista de subtítulos.
+    *   **Deslizador de Desplazamiento Global**: Desplaza todos los tiempos hacia adelante o hacia atrás a la vez para alinear perfectamente toda la pista de subtítulos.
     *   **Ayudante de Decaimiento Vocal**: Añade un relleno uniforme al final de cada línea para que coincida mejor con el desvanecimiento natural de la voz de un cantante.
-*   **Vista Previa de Video en Tiempo Real**: Ve tus ediciones reflejadas al instante en el reproductor de video personalizado. La lista de subtítulos se desplaza automáticamente a la línea que se está reproduciendo.
-*   **Entrada/Salida Flexible**: Importa letras desde archivos `.srt`, `.vtt` y `.lrc`, o pega texto sin formato. Exporta tu trabajo a cualquiera de estos formatos con el menú de descarga simplificado.
-*   **Autoguardado de Borradores**: Tu progreso se guarda automáticamente en tu navegador, para que puedas continuar donde lo dejaste.
+*   **Flujo de Trabajo y E/S Flexible**:
+    *   **Vista Previa de Video en Tiempo Real**: Ve tus ediciones reflejadas al instante en el reproductor de video personalizado. La lista de subtítulos se desplaza automáticamente a la línea que se está reproduciendo.
+    *   **Soporte Multiformato**: Importa desde archivos `.txt`, `.srt`, `.vtt` y `.lrc`. Exporta tu trabajo a SRT, VTT o LRC con el menú de descarga simplificado.
+    *   **Autoguardado y Restauración de Borradores**: Tu progreso se guarda automáticamente en tu navegador. Si te vas y vuelves, la aplicación te ofrecerá restaurar tu borrador no guardado.
 
 ## 🚀 Cómo Usar
 
 1.  **Subir Multimedia**: Arrastra y suelta o selecciona tu archivo de video/audio.
-2.  **Proporcionar la Letra**: Pega la letra o importa un archivo de subtítulos existente.
-3.  **Generar**: Haz clic en el botón "Generar" para que la IA cree los subtítulos sincronizados iniciales.
-4.  **Editar y Refinar**: Usa el potente editor para hacer los ajustes necesarios. Utiliza el botón "Refinar" para mejoras de sincronización asistidas por IA.
-5.  **Descargar**: Exporta tus subtítulos sincronizados en el formato que desees.
+2.  **Proporcionar la Letra**: Tienes tres opciones:
+    *   **Transcribir (Recomendado)**: Haz clic en **Transcribir** para que la IA genere la letra y los tiempos automáticamente en un solo paso.
+    *   **Pegar**: Pega la letra directamente en el área de texto.
+    *   **Importar**: Haz clic en **Importar** para cargar la letra desde un archivo `.txt` o un archivo de subtítulos existente (`.srt`, `.vtt`, `.lrc`).
+3.  **Generar/Refinar**:
+    *   Si pegaste o importaste la letra, haz clic en **Generar** para crear los tiempos iniciales.
+    *   Haz clic en **Refinar** en cualquier momento para usar la IA para mejorar la precisión de los tiempos de tus subtítulos actuales.
+4.  **Editar**: Usa el potente editor interactivo para hacer los ajustes finales.
+5.  **Descargar**: Exporta tus subtítulos sincronizados en el formato que desees (SRT, VTT o LRC).
 
 ---
 
