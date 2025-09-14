@@ -124,6 +124,16 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Log user's browser language for analytics purposes
+  useEffect(() => {
+    const userLang = navigator.language || (navigator.languages && navigator.languages[0]);
+    if (userLang) {
+        // This log is for development purposes and can be connected to an analytics service later.
+        // It helps understand the user base to prioritize future language support.
+        console.log(`SRT Lyric Sync: User browser language detected - ${userLang}`);
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
   // Auto-save SRT entries to localStorage with debouncing
   useEffect(() => {
     if (isLoading || isRefining) return; // Don't save while a process is running
