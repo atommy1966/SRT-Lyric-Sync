@@ -147,6 +147,7 @@
           copyLyrics: "Copy lyrics",
           clearLyrics: "Clear lyrics",
           import: "Import",
+          importActive: "Importing...",
           importTooltip: "Import subtitles from a file (.srt, .vtt, .lrc, .txt)",
           transcribe: "Transcribe",
           transcribeTooltip: "Transcribe audio and generate subtitles in one step.",
@@ -248,6 +249,7 @@
           copyLyrics: "歌詞をコピー",
           clearLyrics: "歌詞を消去",
           import: "インポート",
+          importActive: "インポート中...",
           importTooltip: "ファイルから字幕をインポート (.srt, .vtt, .lrc, .txt)",
           transcribe: "文字起こし",
           transcribeTooltip: "音声を文字起こしし、字幕を一度に生成します。",
@@ -349,6 +351,7 @@
           copyLyrics: "Copiar letra",
           clearLyrics: "Limpiar letra",
           import: "Importar",
+          importActive: "Importando...",
           importTooltip: "Importar subtítulos desde un archivo (.srt, .vtt, .lrc, .txt)",
           transcribe: "Transcribir",
           transcribeTooltip: "Transcribe el audio y genera subtítulos en un solo paso.",
@@ -450,6 +453,7 @@
           copyLyrics: "复制歌词",
           clearLyrics: "清除歌词",
           import: "导入",
+          importActive: "导入中...",
           importTooltip: "从文件导入字幕 (.srt, .vtt, .lrc, .txt)",
           transcribe: "转录",
           transcribeTooltip: "一步完成音频转录和字幕生成。",
@@ -943,7 +947,7 @@
       `;
           const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: { parts: [{ text: prompt }] },
+            contents: prompt,
             config: {
               responseMimeType: "application/json",
               responseSchema: srtDataSchema,
@@ -985,7 +989,7 @@
             `;
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: { parts: [{ text: prompt }] },
+                contents: prompt,
                 config: {
                     responseMimeType: "application/json",
                     responseSchema: languageDetectionSchema,
@@ -1664,10 +1668,36 @@
 
       // ** components/InfoIconWithTooltip.tsx **
       const InfoIconWithTooltip = ({ text }) => {
-          return CE('div', { className: "relative flex items-center group ml-2" },
+          const tooltipRef = useRef(null);
+          const containerRef = useRef(null);
+
+          const handleMouseEnter = () => {
+              if (!tooltipRef.current || !containerRef.current) return;
+
+              const tooltip = tooltipRef.current;
+              const container = containerRef.current;
+
+              const { top: containerTop } = container.getBoundingClientRect();
+              const tooltipHeight = tooltip.offsetHeight;
+              
+              if (containerTop < tooltipHeight + 8) { // 8px margin
+                  tooltip.classList.remove('bottom-full', 'mb-2');
+                  tooltip.classList.add('top-full', 'mt-2');
+              } else {
+                  tooltip.classList.remove('top-full', 'mt-2');
+                  tooltip.classList.add('bottom-full', 'mb-2');
+              }
+          };
+
+          return CE('div', { 
+                  ref: containerRef, 
+                  className: "relative flex items-center group ml-2",
+                  onMouseEnter: handleMouseEnter
+              },
               CE(InformationCircleIcon, { className: "w-5 h-5 text-gray-400 hover:text-gray-300 cursor-help transition-colors" }),
               CE('div', {
-                  className: "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 text-sm text-left text-gray-200 bg-gray-800 border border-gray-600 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 pointer-events-none z-50",
+                  ref: tooltipRef,
+                  className: "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 text-sm text-left text-gray-200 bg-gray-800 border border-gray-600 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50",
                   role: "tooltip"
               }, text)
           );
@@ -1715,6 +1745,7 @@
         const [loadingMessage, setLoadingMessage] = useState('');
         const [isRefining, setIsRefining] = useState(false);
         const [isTranslating, setIsTranslating] = useState(false);
+        const [isImporting, setIsImporting] = useState(false);
         const [targetLanguage, setTargetLanguage] = useState('English');
         const [error, setError] = useState(null);
         const [draftToRestore, setDraftToRestore] = useState(null);
@@ -2079,59 +2110,62 @@
             }
         };
         const handleImportSubtitles = (file) => {
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            const content = e.target?.result;
-            if (!content) {
-              setError(t('errorFileEmpty'));
-              return;
-            }
-            try {
-              const extension = file.name.split('.').pop()?.toLowerCase();
-              if (extension === 'txt') {
-                const detectedLang = await detectLanguage(content);
-                setContentLanguage(detectedLang || language);
-                setError(null);
-                setLyrics(content);
-                setImportedFileName(file.name);
-                resetSrtEntries([]);
-                setOffset(0);
-                setEndTimePadding(0);
-                if (videoFile) handleGenerateSrt(content);
-                return;
-              }
-              let parsedEntries = [];
-              switch (extension) {
-                case 'srt': parsedEntries = parseSrt(content); break;
-                case 'vtt': parsedEntries = parseVtt(content); break;
-                case 'lrc': parsedEntries = parseLrc(content); break;
-                default: setError(t('errorUnsupportedFileType', {extension})); return;
-              }
-              if (parsedEntries.length === 0) {
-                setError(t('errorNoEntriesFound'));
-                return;
-              }
-              const fullText = parsedEntries.map(entry => entry.text).join('\n');
-              const detectedLang = await detectLanguage(fullText);
-              setContentLanguage(detectedLang || language);
-              setError(null);
-              setLyrics(fullText);
-              resetSrtEntries(parsedEntries);
-              setOffset(0);
-              setEndTimePadding(0);
-              setImportedFileName(file.name);
-            } catch (err) {
-              console.error('Error parsing subtitle file:', err);
-              const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-              setError(t('errorFailedToParseFile', {error: errorMessage}));
-              setImportedFileName(null);
-            }
-          };
-          reader.onerror = () => {
-            setError('Error reading the file.');
-            setImportedFileName(null);
-          };
-          reader.readAsText(file);
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const content = e.target?.result;
+                if (!content) {
+                    setError(t('errorFileEmpty'));
+                    return;
+                }
+                const extension = file.name.split('.').pop()?.toLowerCase();
+                if (extension === 'txt' && videoFile) {
+                    setLyrics(content);
+                    setImportedFileName(file.name);
+                    handleGenerateSrt(content);
+                    return;
+                }
+                setIsImporting(true);
+                try {
+                    let parsedEntries = [];
+                    let fullText = content;
+                    if (extension === 'txt') {
+                    } else {
+                        switch (extension) {
+                            case 'srt': parsedEntries = parseSrt(content); break;
+                            case 'vtt': parsedEntries = parseVtt(content); break;
+                            case 'lrc': parsedEntries = parseLrc(content); break;
+                            default:
+                                setError(t('errorUnsupportedFileType', { extension }));
+                                return;
+                        }
+                        if (parsedEntries.length === 0) {
+                            setError(t('errorNoEntriesFound'));
+                            return;
+                        }
+                        fullText = parsedEntries.map(entry => entry.text).join('\n');
+                    }
+                    const detectedLang = await detectLanguage(fullText);
+                    setContentLanguage(detectedLang || language);
+                    setError(null);
+                    setLyrics(fullText);
+                    resetSrtEntries(parsedEntries);
+                    setOffset(0);
+                    setEndTimePadding(0);
+                    setImportedFileName(file.name);
+                } catch (err) {
+                    console.error('Error parsing subtitle file:', err);
+                    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+                    setError(t('errorFailedToParseFile', { error: errorMessage }));
+                    setImportedFileName(null);
+                } finally {
+                    setIsImporting(false);
+                }
+            };
+            reader.onerror = () => {
+                setError('Error reading the file.');
+                setImportedFileName(null);
+            };
+            reader.readAsText(file);
         };
         const handleImportClick = () => subtitleInputRef.current?.click();
         const handleSubtitleFileChange = (e) => {
@@ -2196,7 +2230,7 @@
           setIsDownloadMenuOpen(false);
         };
 
-        const allControlsDisabled = isRefining || isLoading || isTranslating;
+        const allControlsDisabled = isRefining || isLoading || isTranslating || isImporting;
         const canGenerate = videoFile !== null && lyrics.trim().length > 0 && !allControlsDisabled;
         const canTranscribe = videoFile !== null && !allControlsDisabled;
         const isAudio = videoFile?.type.startsWith('audio/');
@@ -2256,7 +2290,12 @@
                        CE(InfoIconWithTooltip, { text: t('lyricsTooltip') })
                     ),
                     CE('div', { className: "flex items-center gap-2" },
-                      CE('button', { onClick: handleImportClick, disabled: allControlsDisabled, className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed", title: t('importTooltip') }, CE(UploadIcon, { className: "w-5 h-5" }), t('import')),
+                      CE('button', {
+                        onClick: handleImportClick,
+                        disabled: allControlsDisabled,
+                        className: "flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed min-w-[110px]",
+                        title: t('importTooltip')
+                      }, isImporting ? CE('div', { className: "w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin" }) : CE(UploadIcon, { className: "w-5 h-5" }), isImporting ? t('importActive') : t('import')),
                       CE('input', { type: "file", ref: subtitleInputRef, onChange: handleSubtitleFileChange, accept: ".srt,.vtt,.lrc,.txt", className: "hidden", disabled: allControlsDisabled }),
                       CE('button', { onClick: handleTranscribe, disabled: !canTranscribe, className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed", title: canTranscribe ? t('transcribeTooltip') : t('transcribeDisabledTooltip') }, CE(MicrophoneIcon, { className: "w-5 h-5" }), activeProcess === 'transcribe' ? t('transcribeActive') : t('transcribe')),
                       CE('button', { onClick: handleGenerate, disabled: !canGenerate, className: "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out bg-teal-600 hover:bg-teal-500 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none", title: canGenerate ? t('generateTooltip') : t('generateDisabledTooltip') }, CE(SparklesIcon, { className: "w-5 h-5" }), activeProcess === 'generate' ? t('generateActive') : t('generate'))
