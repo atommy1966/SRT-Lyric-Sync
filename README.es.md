@@ -12,6 +12,7 @@ Sube un archivo de audio o un video con audio y proporciona la letra completa o 
 *   **Transcripción y Sincronización con IA**:
     *   **Transcripción con Un Clic**: ¿No tienes la letra? Deja que la IA transcriba el audio por ti directamente en el editor y genere subtítulos sincronizados en un solo paso.
     *   **Sincronización Automática**: Si ya tienes la letra, simplemente pégala y deja que la IA cree un archivo de subtítulos perfectamente sincronizado en segundos.
+*   **Interfaz Multilingüe**: Disfruta de una experiencia totalmente localizada con soporte para inglés, español, japonés y chino.
 *   **Traducción con Un Clic**: Traduce instantáneamente tus subtítulos a múltiples idiomas utilizando la herramienta de traducción con IA integrada. Perfecto para alcanzar una audiencia global.
 *   **Refinamiento de Alta Precisión con IA**: Afina los tiempos generados con un solo clic. La IA analiza el decaimiento vocal y el fraseo para una precisión de nivel profesional.
 *   **Editor Interactivo Avanzado**:
@@ -27,6 +28,8 @@ Sube un archivo de audio o un video con audio y proporciona la letra completa o 
 *   **Flujo de Trabajo y E/S Flexible**:
     *   **Vista Previa de Video en Tiempo Real**: Ve tus ediciones reflejadas al instante en el reproductor de video personalizado. La lista de subtítulos se desplaza automáticamente a la línea que se está reproduciendo.
     *   **Soporte Multiformato**: Importa desde archivos `.txt`, `.srt`, `.vtt` y `.lrc`. Exporta tu trabajo a SRT, VTT o LRC con el menú de descarga simplificado.
+    *   **Generación Inteligente de Nombres de Archivo**: La aplicación detecta automáticamente el idioma de tus subtítulos e incluye el código de idioma (p. ej., `_es.srt`) en el nombre del archivo descargado para una fácil organización.
+    *   **Pegar para Analizar**: Pega contenido en formato SRT, VTT o LRC directamente en el área de la letra, y la aplicación detectará automáticamente el formato y te ofrecerá cargarlo en el editor con un solo clic.
     *   **Autoguardado y Restauración de Borradores**: Tu progreso se guarda automáticamente en tu navegador. Si te vas y vuelves, la aplicación te ofrecerá restaurar tu borrador no guardado.
 
 ## 🎬 Casos de Uso
@@ -41,7 +44,7 @@ Esta aplicación no es solo para sincronizar letras de canciones. Sus funciones 
 
 ## 🚀 Cómo Usar
 
-1.  **Subir Multimedia**: Arrastra y suelta o selecciona tu archivo de video/audio.
+1.  **Subir Video/Audio**: Arrastra y suelta o selecciona tu archivo de video/audio.
 2.  **Proporcionar la Letra**: Tienes tres opciones:
     *   **Transcribir (Recomendado)**: Haz clic en **Transcribir** para que la IA genere la letra y los tiempos automáticamente en un solo paso.
     *   **Pegar**: Pega la letra directamente en el área de texto.

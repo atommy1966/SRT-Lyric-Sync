@@ -25,7 +25,27 @@
     <meta property="twitter:description" content="Create perfectly synchronized subtitles with AI. Automatically transcribes or syncs lyrics to video/audio. Supports SRT, VTT, LRC formats." />
     <meta property="twitter:image" content="https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.32.26.png" />
     
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Performance Optimization: Preconnect to font domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Performance Optimization: Asynchronously load Google Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&display=swap"></noscript>
+
+    <!-- Performance Optimization: Configure Tailwind and load it asynchronously -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Google Sans Text', 'sans-serif'],
+            },
+          }
+        }
+      }
+    </script>
+    <script defer src="https://cdn.tailwindcss.com"></script>
+
     <script defer data-domain="srt-lyric-sync-369376059789.us-west1.run.app" src="https://plausible.io/js/script.file-downloads.hash.outbound-links.pageview-props.revenue.tagged-events.js"></script>
     <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
   <script type="importmap">
@@ -86,6 +106,419 @@
       import { GoogleGenAI, Type } from "@google/genai";
 
       // --- Start of inlined files ---
+      
+      // ** i18n/config.ts **
+      const supportedLanguages = [
+        { code: 'en', name: 'English' },
+        { code: 'ja', name: '日本語' },
+        { code: 'es', name: 'Español' },
+        { code: 'zh-CN', name: '简体中文' }
+      ];
+
+      const translations = {
+        en: {
+          appTitle: "SRT Lyric Sync",
+          appSubtitle: "AI-powered subtitle synchronization",
+          appDescriptionTooltip: "This tool uses AI to synchronize lyrics with an audio or video file, creating subtitle files (SRT, VTT, LRC). You can either provide lyrics or have the AI transcribe them for you.",
+          languageSelectorLabel: "Select Language",
+          draftFound: "Found an unsaved draft",
+          draftForFile: " for \"{fileName}\"",
+          draftQuery: ". Would you like to restore it?",
+          draftRestore: "Restore",
+          draftDismiss: "Dismiss",
+          uploadHeader: "1. Upload Video or Audio",
+          previewHeaderAudio: "1. Preview Audio",
+          previewHeaderVideo: "1. Preview Video",
+          uploadTooltip: "Upload your video (MP4, MOV) or audio (MP3, WAV) file. Max size: 15MB. The file is processed in your browser and is not uploaded to any server for storage.",
+          lyricsHeader: "2. Provide Lyrics",
+          lyricsTooltip: "1) Paste lyrics directly. 2) Import a text file (.txt) or subtitle file (.srt, .vtt, .lrc). 3) Click 'Transcribe' to let AI generate lyrics and subtitles from your video/audio file in one go.",
+          editorHeader: "3. Edit Your Subtitles",
+          editorTooltip: "Review and edit your subtitles. Click on a subtitle to jump to that time in the video. Use the tools to refine timings, translate, adjust global offsets, or download the final file.",
+          clickToUpload: "Click to upload",
+          dragAndDrop: " or drag and drop",
+          fileTypes: "Video (MP4, MOV) or Audio (MP3, WAV)",
+          maxFileSize: "Max file size: {size}MB",
+          removeMedia: "Remove",
+          lyricsPlaceholder: "Paste lyrics here, or upload a video/audio file and click 'Transcribe'...",
+          pasteFromClipboard: "Paste from clipboard",
+          copied: "Copied!",
+          copyLyrics: "Copy lyrics",
+          clearLyrics: "Clear lyrics",
+          import: "Import",
+          importTooltip: "Import subtitles from a file (.srt, .vtt, .lrc, .txt)",
+          transcribe: "Transcribe",
+          transcribeTooltip: "Transcribe audio and generate subtitles in one step.",
+          transcribeActive: "Processing...",
+          transcribeDisabledTooltip: "Upload a video/audio file to enable transcription.",
+          generate: "Generate",
+          generateTooltip: "Generate synchronized subtitles from your lyrics and video/audio file.",
+          generateActive: "Generating...",
+          generateDisabledTooltip: "Upload a video/audio file and provide lyrics to enable.",
+          undo: "Undo",
+          redo: "Redo",
+          languageSelectLabelDropdown: "Select language to translate to",
+          translate: "Translate",
+          translateActive: "Translating...",
+          translateTooltip: "Translate to {language}",
+          refine: "Refine",
+          refineTooltip: "Use AI to improve timing accuracy",
+          downloadSRT: "Download SRT",
+          downloadSRTTooltip: "Download SRT file",
+          moreDownloads: "More download options",
+          downloadVTT: "Download VTT",
+          downloadLRC: "Download LRC",
+          globalOffset: "Global Timing Offset",
+          globalOffsetTooltip: "Shift all subtitle timestamps forward or backward simultaneously.",
+          vocalDecay: "Vocal Decay Helper (End Time Padding)",
+          vocalDecayTooltip: "Adds a small delay to the end of each subtitle to account for vocal decay.",
+          resetOffset: "Reset offset",
+          resetPadding: "Reset padding",
+          setTimeToCurrent: "Set to video's current time",
+          splitLine: "Split Line",
+          splitLineTooltip: "Split subtitle at cursor position",
+          dragToReorder: "Drag to reorder",
+          moveUp: "Move Up",
+          moveDown: "Move Down",
+          insertLineBelow: "Insert Line Below",
+          mergeWithNext: "Merge with Next",
+          delete: "Delete",
+          play: "Play",
+          pause: "Pause",
+          mute: "Mute",
+          unmute: "Unmute",
+          volume: "Volume",
+          toggleFullscreen: "Toggle Fullscreen",
+          loadingRefining: "Refining timings...",
+          loadingTranscribingStep1: "Step 1/3: Transcribing audio...",
+          loadingTranscribingStep2: "Step 2/3: Analyzing audio & syncing lyrics...",
+          loadingTranscribingStep3: "Step 3/3: Refining timings for accuracy...",
+          loadingGeneratingStep1: "Step 1/2: Analyzing audio & syncing lyrics...",
+          loadingGeneratingStep2: "Step 2/2: Refining timings for accuracy...",
+          loadingGeneric: "This may take a few minutes for longer videos.",
+          placeholder: "Your generated SRT file will appear here.",
+          mediaMissing: "Video/Audio File Missing",
+          mediaMissingDescription: "Please re-upload the original video/audio file to edit and preview the subtitles.",
+          errorGeneric: "An unexpected error occurred.",
+          errorFailedToProcess: "Failed to process: {error}",
+          errorFileTooLarge: "File is too large. Please select a file smaller than {size}MB.",
+          errorNoSubtitlesToRefine: "There are no subtitles to refine.",
+          errorNoSubtitlesToTranslate: "There are no subtitles to translate.",
+          errorMediaNeededForRefine: "Please upload the video/audio file to use the refine feature.",
+          errorMediaNeededForGenerate: "Please upload a video/audio file before generating subtitles.",
+          errorLyricsNeededForGenerate: "Lyrics are empty. Please provide lyrics to generate subtitles.",
+          errorFailedToParseFile: "Failed to parse file: {error}",
+          errorFileEmpty: "File is empty or could not be read.",
+          errorUnsupportedFileType: "Unsupported file type: .{extension}",
+          errorNoEntriesFound: "No valid subtitle entries found in the file.",
+          errorPasteBlocked: "Pasting with the button was blocked by your browser.\n\nThis is a common security measure in modern web browsers, especially in secure environments.\n\nPlease paste directly into the text area using your keyboard (Ctrl+V or Cmd+V).",
+          draftRestored: "Draft restored. Please re-upload the original video/audio file to use the preview and refine functions.",
+          detectedFormatLoad: "Detected {format} format. Click to load into editor.",
+          poweredBy: "Powered by Google Gemini",
+        },
+        ja: {
+          appTitle: "SRTリリックシンク",
+          appSubtitle: "AIによる字幕同期ツール",
+          appDescriptionTooltip: "このツールはAIを使い、歌詞を音声・動画ファイルと同期させ、字幕ファイル（SRT, VTT, LRC）を作成します。歌詞を直接入力するか、AIに文字起こしさせることも可能です。",
+          languageSelectorLabel: "言語を選択",
+          draftFound: "未保存の下書きが見つかりました",
+          draftForFile: "（ファイル名: \"{fileName}\"）",
+          draftQuery: "。復元しますか？",
+          draftRestore: "復元",
+          draftDismiss: "破棄",
+          uploadHeader: "1. 動画または音声をアップロード",
+          previewHeaderAudio: "1. 音声をプレビュー",
+          previewHeaderVideo: "1. 動画をプレビュー",
+          uploadTooltip: "動画（MP4, MOV）または音声（MP3, WAV）ファイルをアップロードしてください。最大サイズ: 15MB。ファイルはブラウザ内で処理され、サーバーには保存されません。",
+          lyricsHeader: "2. 歌詞を入力",
+          lyricsTooltip: "1) 歌詞を直接貼り付け。 2) テキストファイル（.txt）または字幕ファイル（.srt, .vtt, .lrc）をインポート。 3)「文字起こし」をクリックすると、AIが動画/音声ファイルから歌詞と字幕を一度に生成します。",
+          editorHeader: "3. 字幕を編集",
+          editorTooltip: "字幕を確認・編集します。字幕をクリックすると、動画のその時間にジャンプします。ツールを使ってタイミングの調整、翻訳、全体的なオフセットの変更、最終ファイルのダウンロードができます。",
+          clickToUpload: "クリックしてアップロード",
+          dragAndDrop: "またはドラッグ＆ドロップ",
+          fileTypes: "動画 (MP4, MOV) または 音声 (MP3, WAV)",
+          maxFileSize: "最大ファイルサイズ: {size}MB",
+          removeMedia: "削除",
+          lyricsPlaceholder: "ここに歌詞を貼り付けるか、動画/音声ファイルをアップロードして「文字起こし」をクリックしてください...",
+          pasteFromClipboard: "クリップボードから貼り付け",
+          copied: "コピーしました！",
+          copyLyrics: "歌詞をコピー",
+          clearLyrics: "歌詞を消去",
+          import: "インポート",
+          importTooltip: "ファイルから字幕をインポート (.srt, .vtt, .lrc, .txt)",
+          transcribe: "文字起こし",
+          transcribeTooltip: "音声を文字起こしし、字幕を一度に生成します。",
+          transcribeActive: "処理中...",
+          transcribeDisabledTooltip: "動画/音声ファイルをアップロードすると有効になります。",
+          generate: "生成",
+          generateTooltip: "歌詞と動画/音声ファイルから同期した字幕を生成します。",
+          generateActive: "生成中...",
+          generateDisabledTooltip: "動画/音声ファイルをアップロードし、歌詞を入力すると有効になります。",
+          undo: "元に戻す",
+          redo: "やり直し",
+          languageSelectLabelDropdown: "翻訳する言語を選択",
+          translate: "翻訳",
+          translateActive: "翻訳中...",
+          translateTooltip: "{language}に翻訳",
+          refine: "リファイン",
+          refineTooltip: "AIを使ってタイミングの精度を向上させます",
+          downloadSRT: "SRTをダウンロード",
+          downloadSRTTooltip: "SRTファイルをダウンロード",
+          moreDownloads: "その他の形式",
+          downloadVTT: "VTTをダウンロード",
+          downloadLRC: "LRCをダウンロード",
+          globalOffset: "グローバルタイミングオフセット",
+          globalOffsetTooltip: "すべての字幕のタイムスタンプを同時に前後にずらします。",
+          vocalDecay: "ボーカル減衰ヘルパー（終了時間補正）",
+          vocalDecayTooltip: "各字幕の終わりに短い遅延を追加し、声の余韻を表現します。",
+          resetOffset: "オフセットをリセット",
+          resetPadding: "補正をリセット",
+          setTimeToCurrent: "動画の現在時間に設定",
+          splitLine: "行を分割",
+          splitLineTooltip: "カーソル位置で字幕を分割します",
+          dragToReorder: "ドラッグして並べ替え",
+          moveUp: "上に移動",
+          moveDown: "下に移動",
+          insertLineBelow: "下に行を挿入",
+          mergeWithNext: "次と結合",
+          delete: "削除",
+          play: "再生",
+          pause: "一時停止",
+          mute: "ミュート",
+          unmute: "ミュート解除",
+          volume: "音量",
+          toggleFullscreen: "全画面表示の切り替え",
+          loadingRefining: "タイミングを調整中...",
+          loadingTranscribingStep1: "ステップ1/3: 音声を文字起こし中...",
+          loadingTranscribingStep2: "ステップ2/3: 音声を分析し、歌詞を同期中...",
+          loadingTranscribingStep3: "ステップ3/3: タイミングの精度を向上中...",
+          loadingGeneratingStep1: "ステップ1/2: 音声を分析し、歌詞を同期中...",
+          loadingGeneratingStep2: "ステップ2/2: タイミングの精度を向上中...",
+          loadingGeneric: "長い動画の場合、数分かかることがあります。",
+          placeholder: "生成されたSRTファイルはここに表示されます。",
+          mediaMissing: "動画/音声ファイルがありません",
+          mediaMissingDescription: "字幕を編集・プレビューするには、元の動画/音声ファイルを再アップロードしてください。",
+          errorGeneric: "予期せぬエラーが発生しました。",
+          errorFailedToProcess: "処理に失敗しました: {error}",
+          errorFileTooLarge: "ファイルが大きすぎます。{size}MB未満のファイルを選択してください。",
+          errorNoSubtitlesToRefine: "リファインする字幕がありません。",
+          errorNoSubtitlesToTranslate: "翻訳する字幕がありません。",
+          errorMediaNeededForRefine: "リファイン機能を使うには動画/音声ファイルをアップロードしてください。",
+          errorMediaNeededForGenerate: "字幕を生成する前に動画/音声ファイルをアップロードしてください。",
+          errorLyricsNeededForGenerate: "歌詞が空です。字幕を生成するには歌詞を入力してください。",
+          errorFailedToParseFile: "ファイルの解析に失敗しました: {error}",
+          errorFileEmpty: "ファイルが空か、読み込めませんでした。",
+          errorUnsupportedFileType: "サポートされていないファイル形式です: .{extension}",
+          errorNoEntriesFound: "ファイル内に有効な字幕が見つかりませんでした。",
+          errorPasteBlocked: "ブラウザのセキュリティ設定により、ボタンでの貼り付けがブロックされました。\n\nキーボードのショートカット（Ctrl+V または Cmd+V）を使って直接テキストエリアに貼り付けてください。",
+          draftRestored: "下書きを復元しました。プレビューやリファイン機能を使うには、元の動画/音声ファイルを再アップロードしてください。",
+          detectedFormatLoad: "「{format}」形式を検出しました。クリックしてエディタに読み込みます。",
+          poweredBy: "Powered by Google Gemini",
+        },
+        es: {
+          appTitle: "SRT Lyric Sync",
+          appSubtitle: "Sincronización de subtítulos con IA",
+          appDescriptionTooltip: "Esta herramienta utiliza IA para sincronizar letras con un archivo de audio o video, creando archivos de subtítulos (SRT, VTT, LRC). Puedes proporcionar la letra o dejar que la IA la transcriba por ti.",
+          languageSelectorLabel: "Seleccionar Idioma",
+          draftFound: "Se encontró un borrador no guardado",
+          draftForFile: " para \"{fileName}\"",
+          draftQuery: ". ¿Te gustaría restaurarlo?",
+          draftRestore: "Restaurar",
+          draftDismiss: "Descartar",
+          uploadHeader: "1. Subir Video o Audio",
+          previewHeaderAudio: "1. Vista Previa de Audio",
+          previewHeaderVideo: "1. Vista Previa de Video",
+          uploadTooltip: "Sube tu archivo de video (MP4, MOV) o audio (MP3, WAV). Tamaño máximo: 15MB. El archivo se procesa en tu navegador y no se sube a ningún servidor.",
+          lyricsHeader: "2. Proporcionar Letra",
+          lyricsTooltip: "1) Pega la letra directamente. 2) Importa un archivo de texto (.txt) o de subtítulos (.srt, .vtt, .lrc). 3) Haz clic en 'Transcribir' para que la IA genere la letra y los subtítulos a partir de tu archivo de video/audio de una sola vez.",
+          editorHeader: "3. Editar Tus Subtítulos",
+          editorTooltip: "Revisa y edita tus subtítulos. Haz clic en un subtítulo para saltar a ese momento en el video. Usa las herramientas para refinar tiempos, traducir, ajustar desplazamientos globales o descargar el archivo final.",
+          clickToUpload: "Haz clic para subir",
+          dragAndDrop: " o arrastra y suelta",
+          fileTypes: "Video (MP4, MOV) o Audio (MP3, WAV)",
+          maxFileSize: "Tamaño máx. de archivo: {size}MB",
+          removeMedia: "Quitar",
+          lyricsPlaceholder: "Pega la letra aquí, o sube un archivo de video/audio y haz clic en 'Transcribir'...",
+          pasteFromClipboard: "Pegar del portapapeles",
+          copied: "¡Copiado!",
+          copyLyrics: "Copiar letra",
+          clearLyrics: "Limpiar letra",
+          import: "Importar",
+          importTooltip: "Importar subtítulos desde un archivo (.srt, .vtt, .lrc, .txt)",
+          transcribe: "Transcribir",
+          transcribeTooltip: "Transcribe el audio y genera subtítulos en un solo paso.",
+          transcribeActive: "Procesando...",
+          transcribeDisabledTooltip: "Sube un archivo de video/audio para habilitar la transcripción.",
+          generate: "Generar",
+          generateTooltip: "Genera subtítulos sincronizados a partir de tu letra y archivo de video/audio.",
+          generateActive: "Generando...",
+          generateDisabledTooltip: "Sube un archivo de video/audio y proporciona la letra para habilitar.",
+          undo: "Deshacer",
+          redo: "Rehacer",
+          languageSelectLabelDropdown: "Seleccionar idioma para traducir",
+          translate: "Traducir",
+          translateActive: "Traduciendo...",
+          translateTooltip: "Traducir a {language}",
+          refine: "Refinar",
+          refineTooltip: "Usa IA para mejorar la precisión de los tiempos",
+          downloadSRT: "Descargar SRT",
+          downloadSRTTooltip: "Descargar archivo SRT",
+          moreDownloads: "Más opciones",
+          downloadVTT: "Descargar VTT",
+          downloadLRC: "Descargar LRC",
+          globalOffset: "Desplazamiento Global de Tiempo",
+          globalOffsetTooltip: "Desplaza todos los tiempos de los subtítulos hacia adelante o atrás simultáneamente.",
+          vocalDecay: "Ayudante de Decaimiento Vocal (Relleno Final)",
+          vocalDecayTooltip: "Añade un pequeño retardo al final de cada subtítulo para reflejar el desvanecimiento de la voz.",
+          resetOffset: "Reiniciar desplazamiento",
+          resetPadding: "Reiniciar relleno",
+          setTimeToCurrent: "Ajustar a tiempo actual del video",
+          splitLine: "Dividir Línea",
+          splitLineTooltip: "Divide el subtítulo en la posición del cursor",
+          dragToReorder: "Arrastra para reordenar",
+          moveUp: "Mover Arriba",
+          moveDown: "Mover Abajo",
+          insertLineBelow: "Insertar Línea Debajo",
+          mergeWithNext: "Fusionar con Siguiente",
+          delete: "Eliminar",
+          play: "Reproducir",
+          pause: "Pausa",
+          mute: "Silenciar",
+          unmute: "Activar sonido",
+          volume: "Volumen",
+          toggleFullscreen: "Pantalla Completa",
+          loadingRefining: "Refinando tiempos...",
+          loadingTranscribingStep1: "Paso 1/3: Transcribiendo audio...",
+          loadingTranscribingStep2: "Paso 2/3: Analizando audio y sincronizando letra...",
+          loadingTranscribingStep3: "Paso 3/3: Refinando precisión de tiempos...",
+          loadingGeneratingStep1: "Paso 1/2: Analizando audio y sincronizando letra...",
+          loadingGeneratingStep2: "Paso 2/2: Refinando precisión de tiempos...",
+          loadingGeneric: "Esto puede tardar unos minutos para videos más largos.",
+          placeholder: "Tu archivo SRT generado aparecerá aquí.",
+          mediaMissing: "Falta el Archivo de Video/Audio",
+          mediaMissingDescription: "Por favor, vuelve a subir el archivo de video/audio original para editar y previsualizar los subtítulos.",
+          errorGeneric: "Ocurrió un error inesperado.",
+          errorFailedToProcess: "Fallo al procesar: {error}",
+          errorFileTooLarge: "El archivo es demasiado grande. Por favor, selecciona un archivo de menos de {size}MB.",
+          errorNoSubtitlesToRefine: "No hay subtítulos para refinar.",
+          errorNoSubtitlesToTranslate: "No hay subtítulos para traducir.",
+          errorMediaNeededForRefine: "Por favor, sube el archivo de video/audio para usar la función de refinar.",
+          errorMediaNeededForGenerate: "Por favor, sube un archivo de video/audio antes de generar subtítulos.",
+          errorLyricsNeededForGenerate: "La letra está vacía. Por favor, proporciona la letra para generar subtítulos.",
+          errorFailedToParseFile: "Fallo al analizar el archivo: {error}",
+          errorFileEmpty: "El archivo está vacío o no se pudo leer.",
+          errorUnsupportedFileType: "Tipo de archivo no soportado: .{extension}",
+          errorNoEntriesFound: "No se encontraron entradas de subtítulos válidas en el archivo.",
+          errorPasteBlocked: "El pegado con el botón fue bloqueado por tu navegador.\n\nEsta es una medida de seguridad común en los navegadores web modernos.\n\nPor favor, pega directamente en el área de texto usando tu teclado (Ctrl+V o Cmd+V).",
+          draftRestored: "Borrador restaurado. Por favor, vuelve a subir el archivo de video/audio original para usar las funciones de vista previa y refinado.",
+          detectedFormatLoad: "Formato {format} detectado. Haz clic para cargar en el editor.",
+          poweredBy: "Desarrollado con Google Gemini",
+        },
+        'zh-CN': {
+          appTitle: "SRT 歌词同步",
+          appSubtitle: "AI 驱动的字幕同步工具",
+          appDescriptionTooltip: "本工具使用 AI 将歌词与音频或视频文件同步，创建字幕文件（SRT、VTT、LRC）。您可以提供歌词，也可以让 AI 为您转录。",
+          languageSelectorLabel: "选择语言",
+          draftFound: "发现未保存的草稿",
+          draftForFile: "（文件名：“{fileName}”）",
+          draftQuery: "。您想恢复它吗？",
+          draftRestore: "恢复",
+          draftDismiss: "放弃",
+          uploadHeader: "1. 上传视频或音频",
+          previewHeaderAudio: "1. 预览音频",
+          previewHeaderVideo: "1. 预览视频",
+          uploadTooltip: "上传您的视频（MP4, MOV）或音频（MP3, WAV）文件。最大大小：15MB。文件在您的浏览器中处理，不会上传到任何服务器存储。",
+          lyricsHeader: "2. 提供歌词",
+          lyricsTooltip: "1) 直接粘贴歌词。 2) 导入文本文件 (.txt) 或字幕文件 (.srt, .vtt, .lrc)。 3) 点击“转录”，让 AI 从您的视频/音频文件一步生成歌词和字幕。",
+          editorHeader: "3. 编辑您的字幕",
+          editorTooltip: "检查和编辑您的字幕。点击字幕可跳转到视频中的相应时间。使用工具微调时间、翻译、调整全局偏移或下载最终文件。",
+          clickToUpload: "点击上传",
+          dragAndDrop: "或拖放文件",
+          fileTypes: "视频 (MP4, MOV) 或音频 (MP3, WAV)",
+          maxFileSize: "最大文件大小：{size}MB",
+          removeMedia: "移除",
+          lyricsPlaceholder: "在此处粘贴歌词，或上传视频/音频文件后点击“转录”...",
+          pasteFromClipboard: "从剪贴板粘贴",
+          copied: "已复制！",
+          copyLyrics: "复制歌词",
+          clearLyrics: "清除歌词",
+          import: "导入",
+          importTooltip: "从文件导入字幕 (.srt, .vtt, .lrc, .txt)",
+          transcribe: "转录",
+          transcribeTooltip: "一步完成音频转录和字幕生成。",
+          transcribeActive: "处理中...",
+          transcribeDisabledTooltip: "上传视频/音频文件以启用转录。",
+          generate: "生成",
+          generateTooltip: "从您的歌词和视频/音频文件生成同步字幕。",
+          generateActive: "生成中...",
+          generateDisabledTooltip: "上传视频/音频文件并提供歌词以启用。",
+          undo: "撤销",
+          redo: "重做",
+          languageSelectLabelDropdown: "选择要翻译的语言",
+          translate: "翻译",
+          translateActive: "翻译中...",
+          translateTooltip: "翻译成 {language}",
+          refine: "微调",
+          refineTooltip: "使用 AI 提高时间精度",
+          downloadSRT: "下载 SRT",
+          downloadSRTTooltip: "下载 SRT 文件",
+          moreDownloads: "更多下载选项",
+          downloadVTT: "下载 VTT",
+          downloadLRC: "下载 LRC",
+          globalOffset: "全局时间偏移",
+          globalOffsetTooltip: "同时向前或向后移动所有字幕时间戳。",
+          vocalDecay: "人声衰减助手 (结束时间填充)",
+          vocalDecayTooltip: "为每个字幕的结尾添加少量延迟，以适应人声的自然衰减。",
+          resetOffset: "重置偏移",
+          resetPadding: "重置填充",
+          setTimeToCurrent: "设置为视频当前时间",
+          splitLine: "拆分行",
+          splitLineTooltip: "在光标位置拆分字幕",
+          dragToReorder: "拖动以重新排序",
+          moveUp: "上移",
+          moveDown: "下移",
+          insertLineBelow: "在下方插入行",
+          mergeWithNext: "与下一行合并",
+          delete: "删除",
+          play: "播放",
+          pause: "暂停",
+          mute: "静音",
+          unmute: "取消静音",
+          volume: "音量",
+          toggleFullscreen: "切换全屏",
+          loadingRefining: "正在微调时间...",
+          loadingTranscribingStep1: "第 1/3 步：正在转录音频...",
+          loadingTranscribingStep2: "第 2/3 步：正在分析音频并同步歌词...",
+          loadingTranscribingStep3: "第 3/3 步：正在微调时间精度...",
+          loadingGeneratingStep1: "第 1/2 步：正在分析音频并同步歌词...",
+          loadingGeneratingStep2: "第 2/2 步：正在微调时间精度...",
+          loadingGeneric: "处理长视频可能需要几分钟。",
+          placeholder: "您生成的 SRT 文件将显示在此处。",
+          mediaMissing: "缺少视频/音频文件",
+          mediaMissingDescription: "请重新上传原始视频/音频文件以编辑和预览字幕。",
+          errorGeneric: "发生意外错误。",
+          errorFailedToProcess: "处理失败：{error}",
+          errorFileTooLarge: "文件太大。请选择小于 {size}MB 的文件。",
+          errorNoSubtitlesToRefine: "没有要微调的字幕。",
+          errorNoSubtitlesToTranslate: "没有要翻译的字幕。",
+          errorMediaNeededForRefine: "请上传视频/音频文件以使用微调功能。",
+          errorMediaNeededForGenerate: "生成字幕前请上传视频/音频文件。",
+          errorLyricsNeededForGenerate: "歌词为空。请输入歌词以生成字幕。",
+          errorFailedToParseFile: "解析文件失败：{error}",
+          errorFileEmpty: "文件为空或无法读取。",
+          errorUnsupportedFileType: "不支持的文件类型：.{extension}",
+          errorNoEntriesFound: "在文件中未找到有效的字幕条目。",
+          errorPasteBlocked: "浏览器阻止了按钮粘贴操作。\n\n这是现代网络浏览器中的常见安全措施。\n\n请使用键盘（Ctrl+V 或 Cmd+V）直接粘贴到文本区域。",
+          draftRestored: "草稿已恢复。请重新上传原始视频/音频文件以使用预览和微调功能。",
+          detectedFormatLoad: "检测到 {format} 格式。点击加载到编辑器。",
+          poweredBy: "由 Google Gemini 驱动",
+        },
+      };
+
+      const getInitialLang = () => {
+        const browserLang = navigator.language;
+        const foundLang = supportedLanguages.find(l => browserLang.startsWith(l.code));
+        return foundLang ? foundLang.code : 'en';
+      };
 
       // ** utils/fileUtils.ts **
       const fileToBase64 = (file) => {
@@ -309,6 +742,11 @@
           if (firstBracket !== -1 && lastBracket !== -1) {
               return text.substring(firstBracket, lastBracket + 1);
           }
+          const firstBrace = text.indexOf('{');
+          const lastBrace = text.lastIndexOf('}');
+           if (firstBrace !== -1 && lastBrace !== -1) {
+              return text.substring(firstBrace, lastBrace + 1);
+          }
           return text.trim();
       };
       const srtDataSchema = {
@@ -323,6 +761,16 @@
             },
             required: ["index", "startTime", "endTime", "text"],
           },
+      };
+      const languageDetectionSchema = {
+          type: Type.OBJECT,
+          properties: {
+              languageCode: {
+                  type: Type.STRING,
+                  description: "The two-letter ISO 639-1 code for the detected language (e.g., 'en', 'ja')."
+              }
+          },
+          required: ["languageCode"]
       };
       const processAiResponse = (rawText) => {
           if (!rawText) {
@@ -449,7 +897,7 @@
           const audioPart = { inlineData: { data: videoBase64, mimeType: mimeType } };
           const prompt = `
       You are an expert audio transcription service.
-      Your task is to transcribe the audio from the provided media file accurately.
+      Your task is to transcribe the audio from the provided video/audio file accurately.
       Please format the output with appropriate line breaks to ensure readability.
       - If the content sounds like song lyrics, format each sung line on a new line.
       - If the content is spoken word (like a speech or dialogue), break the text into paragraphs or sentences at natural pauses.
@@ -476,7 +924,7 @@
 
       **IMPORTANT Rules:**
       1.  Translate the 'text' field accurately, preserving the original meaning and tone.
-      2.  DO NOT change the 'index', 'startTime', or 'endTime' fields.
+      2.  DO NOT change the 'index', 'startTime', 'or 'endTime' fields.
       3.  Preserve the original structure of the JSON array and all its objects.
       4.  Your entire response must be ONLY the translated JSON array. Do not add any extra text, explanations, or markdown formatting.
 
@@ -509,6 +957,41 @@
             throw new Error(`Failed to translate subtitles. Details: ${error.message}`);
           }
           throw new Error("An unknown error occurred while translating subtitles.");
+        }
+      };
+       const detectLanguage = async (textToDetect) => {
+        if (!textToDetect || textToDetect.trim().length < 10) {
+            return null;
+        }
+        try {
+            const prompt = `
+                Analyze the following text and determine its primary language.
+                Return ONLY the two-letter ISO 639-1 code for the language.
+                For example, for English text, return "en". For Japanese, return "ja".
+                If multiple languages are present, identify the most dominant one.
+
+                Text to analyze:
+                ---
+                ${textToDetect.substring(0, 2000)}
+                ---
+            `;
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: { parts: [{ text: prompt }] },
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: languageDetectionSchema,
+                },
+            });
+            const jsonString = extractJson(response.text);
+            const result = JSON.parse(jsonString);
+            if (result && typeof result.languageCode === 'string' && result.languageCode.length > 1) {
+                return result.languageCode.toLowerCase().split('-')[0];
+            }
+            return null;
+        } catch (error) {
+            console.error("Error detecting language:", error);
+            return null;
         }
       };
 
@@ -547,16 +1030,16 @@
       const InformationCircleIcon = ({ className }) => CE('svg', { className, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "1.5", stroke: "currentColor" }, CE('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" }));
       
       // ** components/Loader.tsx **
-      const Loader = ({ message }) => {
+      const Loader = ({ message, t }) => {
         return CE('div', { className: "flex flex-col items-center justify-center h-full text-center p-8 bg-gray-800/50 rounded-lg" },
           CE('div', { className: "w-16 h-16 border-4 border-dashed rounded-full animate-spin border-teal-400" }),
           CE('p', { className: "mt-4 text-lg text-gray-300" }, message),
-          CE('p', { className: "mt-2 text-sm text-gray-400" }, "This may take a few minutes for longer videos.")
+          CE('p', { className: "mt-2 text-sm text-gray-400" }, t('loadingGeneric'))
         );
       };
 
       // ** components/FileUpload.tsx **
-      const FileUpload = ({ videoFile, setVideoFile, disabled, videoUrl }) => {
+      const FileUpload = ({ videoFile, setVideoFile, disabled, videoUrl, t }) => {
         const [isPlaying, setIsPlaying] = useState(false);
         const audioRef = useRef(null);
         const handleFileChange = (e) => {
@@ -584,20 +1067,20 @@
             return CE('div', { className: "relative group" },
               CE('audio', { ref: audioRef, src: videoUrl, onPlay: () => setIsPlaying(true), onPause: () => setIsPlaying(false), onEnded: () => setIsPlaying(false), className: "hidden" }),
               CE('div', { onClick: handlePlayPause, className: "bg-gray-800 rounded-lg p-3 flex items-center w-full cursor-pointer hover:bg-gray-700 transition-colors", role: "button", "aria-label": `Play or pause audio file ${videoFile.name}` },
-                CE('button', { className: "p-2 rounded-full bg-gray-700/50 hover:bg-gray-600 text-white flex-shrink-0 mr-3", "aria-label": isPlaying ? 'Pause' : 'Play' },
+                CE('button', { className: "p-2 rounded-full bg-gray-700/50 hover:bg-gray-600 text-white flex-shrink-0 mr-3", "aria-label": isPlaying ? t('pause') : t('play') },
                   isPlaying ? CE(PauseIcon, { className: "w-5 h-5" }) : CE(PlayIcon, { className: "w-5 h-5" })
                 ),
                 CE('span', { className: "text-sm text-gray-300 truncate", title: videoFile.name }, videoFile.name)
               ),
               CE('div', { className: "absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20" },
-                CE('button', { onClick: (e) => { e.stopPropagation(); setVideoFile(null); }, disabled, className: "px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all", "aria-label": "Remove media", title: "Remove media file" }, "Remove")
+                CE('button', { onClick: (e) => { e.stopPropagation(); setVideoFile(null); }, disabled, className: "px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all", "aria-label": t('removeMedia'), title: t('removeMedia') }, t('removeMedia'))
               )
             );
           }
           return CE('div', { className: "relative group bg-black rounded-lg max-h-48 flex items-center justify-center" },
             CE('video', { src: videoUrl, controls: true, className: "w-full max-h-full max-w-full rounded-lg object-contain relative z-10 bg-transparent", "aria-label": "Video preview" }, "Your browser does not support the video tag."),
             CE('div', { className: "absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20" },
-              CE('button', { onClick: () => setVideoFile(null), disabled, className: "px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all", "aria-label": "Remove media", title: "Remove media file" }, "Remove")
+              CE('button', { onClick: () => setVideoFile(null), disabled, className: "px-3 py-1 text-sm bg-red-600 bg-opacity-80 hover:bg-red-700 hover:bg-opacity-100 text-white rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed transition-all", "aria-label": t('removeMedia'), title: t('removeMedia') }, t('removeMedia'))
             )
           );
         }
@@ -605,9 +1088,9 @@
           CE('label', { htmlFor: "dropzone-file", onDragOver: handleDragOver, onDrop: handleDrop, className: `flex flex-col items-center justify-center w-full h-40 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer bg-gray-800 hover:bg-gray-700 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : ''}` },
             CE('div', { className: "flex flex-col items-center justify-center pt-5 pb-6" },
               CE(UploadIcon, { className: "w-10 h-10 mb-3 text-gray-400" }),
-              CE('p', { className: "mb-2 text-sm text-gray-400" }, CE('span', { className: "font-semibold text-teal-400" }, "Click to upload"), " or drag and drop"),
-              CE('p', { className: "text-xs text-gray-500" }, "Video (MP4, MOV) or Audio (MP3, WAV)"),
-              CE('p', { className: "text-xs text-gray-500" }, "Max file size: 15MB")
+              CE('p', { className: "mb-2 text-sm text-gray-400" }, CE('span', { className: "font-semibold text-teal-400" }, t('clickToUpload')), t('dragAndDrop')),
+              CE('p', { className: "text-xs text-gray-400" }, t('fileTypes')),
+              CE('p', { className: "text-xs text-gray-400" }, t('maxFileSize', {size: 15}))
             ),
             CE('input', { id: "dropzone-file", type: "file", className: "hidden", accept: "video/*,audio/*", onChange: handleFileChange, disabled })
           )
@@ -615,7 +1098,7 @@
       };
 
       // ** components/LyricsInput.tsx **
-      const LyricsInput = ({ lyrics, setLyrics, disabled }) => {
+      const LyricsInput = ({ lyrics, setLyrics, disabled, t }) => {
         const [copied, setCopied] = useState(false);
         const textareaRef = useRef(null);
         const handleCopy = () => {
@@ -639,23 +1122,19 @@
               }
           } catch (err) {
               console.error('Failed to paste from clipboard:', err);
-              alert(
-                  "Pasting with the button was blocked by your browser.\n\n" +
-                  "This is a common security measure in modern web browsers, especially in secure environments.\n\n" +
-                  "Please paste directly into the text area using your keyboard (Ctrl+V or Cmd+V)."
-              );
+              alert(t('errorPasteBlocked'));
           }
         };
         return CE('div', { className: "flex flex-col h-full" },
           CE('div', { className: "relative flex-grow" },
-            CE('textarea', { ref: textareaRef, id: "lyrics", "aria-label": "Paste Lyrics", value: lyrics, onChange: (e) => setLyrics(e.target.value), disabled, placeholder: "Paste lyrics here, or upload a media file and click 'Transcribe'...", className: "w-full h-full p-4 pr-16 bg-gray-800 border border-gray-600 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" }),
+            CE('textarea', { ref: textareaRef, id: "lyrics", "aria-label": "Paste Lyrics", value: lyrics, onChange: (e) => setLyrics(e.target.value), disabled, placeholder: t('lyricsPlaceholder'), className: "w-full h-full p-4 pr-16 bg-gray-800 border border-gray-600 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" }),
             CE('div', { className: "absolute top-2.5 right-2.5 flex items-center gap-1" },
-              lyrics.length === 0 && !disabled && CE('button', { onClick: handlePaste, className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": "Paste lyrics", title: "Paste from clipboard" }, CE(ClipboardPasteIcon, { className: "w-5 h-5" })),
+              lyrics.length === 0 && !disabled && CE('button', { onClick: handlePaste, className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": t('pasteFromClipboard'), title: t('pasteFromClipboard') }, CE(ClipboardPasteIcon, { className: "w-5 h-5" })),
               lyrics.length > 0 && !disabled && CE(React.Fragment, null,
-                CE('button', { onClick: handleCopy, className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": copied ? "Copied" : "Copy lyrics", title: copied ? "Copied!" : "Copy lyrics" },
+                CE('button', { onClick: handleCopy, className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": copied ? t('copied') : t('copyLyrics'), title: copied ? t('copied') : t('copyLyrics') },
                   copied ? CE(CheckIcon, { className: "w-5 h-5 text-teal-400" }) : CE(CopyIcon, { className: "w-5 h-5" })
                 ),
-                CE('button', { onClick: () => setLyrics(''), className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": "Clear lyrics", title: "Clear lyrics" },
+                CE('button', { onClick: () => setLyrics(''), className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": t('clearLyrics'), title: t('clearLyrics') },
                   CE(XIcon, { className: "w-5 h-5" })
                 )
               )
@@ -665,7 +1144,7 @@
       };
 
       // ** components/CustomVideoControls.tsx **
-      const CustomVideoControls = ({ isPlaying, onPlayPause, currentTime, duration, onSeek, volume, onVolumeChange, isMuted, onMuteToggle, onFullscreen, isVisible }) => {
+      const CustomVideoControls = ({ isPlaying, onPlayPause, currentTime, duration, onSeek, volume, onVolumeChange, isMuted, onMuteToggle, onFullscreen, isVisible, t }) => {
         const formatTime = (timeInSeconds) => {
           if (isNaN(timeInSeconds) || timeInSeconds < 0) return '00:00';
           const time = Math.floor(timeInSeconds);
@@ -680,19 +1159,19 @@
           ),
           CE('div', { className: "flex items-center justify-between" },
             CE('div', { className: "flex items-center gap-4" },
-              CE('button', { onClick: onPlayPause, className: "text-white hover:text-teal-400 transition-colors", "aria-label": isPlaying ? "Pause" : "Play", title: isPlaying ? "Pause (Space)" : "Play (Space)" },
+              CE('button', { onClick: onPlayPause, className: "text-white hover:text-teal-400 transition-colors", "aria-label": isPlaying ? t('pause') : t('play'), title: isPlaying ? `${t('pause')} (Space)` : `${t('play')} (Space)` },
                 isPlaying ? CE(PauseIcon, { className: "w-8 h-8" }) : CE(PlayIcon, { className: "w-8 h-8" })
               ),
               CE('div', { className: "flex items-center gap-2" },
-                CE('button', { onClick: onMuteToggle, className: "text-white hover:text-teal-400 transition-colors", "aria-label": isMuted ? "Unmute" : "Mute", title: isMuted ? "Unmute" : "Mute" },
+                CE('button', { onClick: onMuteToggle, className: "text-white hover:text-teal-400 transition-colors", "aria-label": isMuted ? t('unmute') : t('mute'), title: isMuted ? t('unmute') : t('mute') },
                   isMuted || volume === 0 ? CE(VolumeOffIcon, { className: "w-6 h-6" }) : CE(VolumeUpIcon, { className: "w-6 h-6" })
                 ),
-                CE('input', { type: "range", min: "0", max: "1", step: "0.05", value: isMuted ? 0 : volume, onChange: (e) => onVolumeChange(parseFloat(e.target.value)), className: "w-24 h-1.5 bg-gray-500/50 rounded-lg appearance-none cursor-pointer", "aria-label": "Volume", title: `Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%` })
+                CE('input', { type: "range", min: "0", max: "1", step: "0.05", value: isMuted ? 0 : volume, onChange: (e) => onVolumeChange(parseFloat(e.target.value)), className: "w-24 h-1.5 bg-gray-500/50 rounded-lg appearance-none cursor-pointer", "aria-label": t('volume'), title: `${t('volume')}: ${Math.round((isMuted ? 0 : volume) * 100)}%` })
               )
             ),
             CE('div', { className: "flex items-center gap-4" },
               CE('span', { className: "text-sm font-mono text-white" }, `${formatTime(currentTime)} / ${formatTime(duration)}`),
-              CE('button', { onClick: onFullscreen, className: "text-white hover:text-teal-400 transition-colors", "aria-label": "Fullscreen", title: "Toggle Fullscreen" },
+              CE('button', { onClick: onFullscreen, className: "text-white hover:text-teal-400 transition-colors", "aria-label": t('toggleFullscreen'), title: t('toggleFullscreen') },
                 CE(ExpandIcon, { className: "w-6 h-6" })
               )
             )
@@ -701,7 +1180,7 @@
       };
 
       // ** components/VideoPreview.tsx **
-      const VideoPreview = forwardRef(({ videoFile, videoUrl, entries, onTimeUpdate }, ref) => {
+      const VideoPreview = forwardRef(({ videoFile, videoUrl, entries, onTimeUpdate, t }, ref) => {
         const localVideoRef = useRef(null);
         const containerRef = useRef(null);
         const trackRef = useRef(null);
@@ -861,12 +1340,13 @@
             onMuteToggle: handleMuteToggle,
             onFullscreen: handleFullscreen,
             isVisible: areControlsVisible,
+            t: t,
           })
         );
       });
 
       // ** components/SrtEntry.tsx **
-      const SrtEntry = ({ entry, onUpdate, onSetTimeToCurrent, onContextMenu, onSplit, onClick, isActive, isCurrent, isFirst, isLast, index, isDragging, isDragOver, onDragStart, onDragOver, onDrop, onDragEnd }) => {
+      const SrtEntry = ({ entry, onUpdate, onSetTimeToCurrent, onContextMenu, onSplit, onClick, isActive, isCurrent, isFirst, isLast, index, isDragging, isDragOver, onDragStart, onDragOver, onDrop, onDragEnd, t }) => {
         const [startTime, setStartTime] = useState(entry.startTime);
         const [endTime, setEndTime] = useState(entry.endTime);
         const [cursorPosition, setCursorPosition] = useState(0);
@@ -920,27 +1400,27 @@
         
         const TimeInput = ({ field, value }) => CE('div', { className: "relative group" },
           CE('input', { type: "text", value, onChange: (e) => handleTimeChange(e, field), onBlur: () => handleTimeBlur(field), onKeyDown: (e) => handleTimeKeyDown(e, field), className: "w-full bg-gray-700 font-mono text-sm p-1 rounded border border-gray-600 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none pr-7", "aria-label": `${field === 'startTime' ? 'Start' : 'End'} time for entry ${entry.index}. Use Arrow keys to adjust.`, title: "Use Arrow Up/Down to adjust by 100ms. Hold Shift for 1s." }),
-          CE('button', { onClick: () => onSetTimeToCurrent(entry.index, field), className: "absolute right-0 top-0 h-full px-1.5 flex items-center text-gray-400 hover:text-teal-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity", title: "Set to video's current time", "aria-label": `Set ${field === 'startTime' ? 'start' : 'end'} time to video's current time` },
+          CE('button', { onClick: () => onSetTimeToCurrent(entry.index, field), className: "absolute right-0 top-0 h-full px-1.5 flex items-center text-gray-400 hover:text-teal-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity", title: t('setTimeToCurrent'), "aria-label": `Set ${field === 'startTime' ? 'start' : 'end'} time to video's current time` },
             CE(TargetIcon, { className: "w-4 h-4" })
           )
         );
 
         return CE('div', { className: containerClasses, onClick, onContextMenu, draggable: true, onDragStart: (e) => onDragStart(e, index), onDragOver: (e) => onDragOver(e, index), onDrop: (e) => onDrop(e, index), onDragEnd },
-          CE('div', { className: "flex-shrink-0 cursor-move pt-1", title: "Drag to reorder" },
-            CE(GripVerticalIcon, { className: "w-5 h-5 text-gray-500" })
+          CE('div', { className: "flex-shrink-0 cursor-move pt-1", title: t('dragToReorder') },
+            CE(GripVerticalIcon, { className: "w-5 h-5 text-gray-400" })
           ),
           CE('div', { className: "flex-grow" },
             CE('div', { className: "flex items-center gap-2 mb-2 w-full max-w-sm" },
-              CE('span', { className: "font-mono text-xs text-gray-500 select-none w-6 text-center" }, entry.index),
+              CE('span', { className: "font-mono text-xs text-gray-400 select-none w-6 text-center" }, entry.index),
               CE('div', { className: "flex-1" }, CE(TimeInput, { field: "startTime", value: startTime })),
-              CE('span', { className: "text-gray-500" }, "→"),
+              CE('span', { className: "text-gray-400" }, "→"),
               CE('div', { className: "flex-1" }, CE(TimeInput, { field: "endTime", value: endTime }))
             ),
             CE('textarea', { ref: textAreaRef, value: entry.text, onChange: handleTextChange, onKeyUp: handleTextareaEvent, onMouseUp: handleTextareaEvent, onFocus: handleTextareaEvent, className: "w-full bg-gray-800 p-2 rounded border border-gray-600 resize-y min-h-[4rem] focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none", rows: 2, "aria-label": `Text for entry ${entry.index}` }),
             isActive && CE('div', { className: "mt-2" },
-              CE('button', { onClick: handleSplitClick, disabled: cursorPosition === 0 || cursorPosition >= entry.text.length, className: "flex items-center gap-1.5 px-2 py-1 text-xs bg-gray-600 hover:bg-indigo-600 rounded-md transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed", title: "Split subtitle at cursor position" },
+              CE('button', { onClick: handleSplitClick, disabled: cursorPosition === 0 || cursorPosition >= entry.text.length, className: "flex items-center gap-1.5 px-2 py-1 text-xs bg-gray-600 hover:bg-indigo-600 rounded-md transition-colors disabled:bg-gray-700 disabled:text-gray-600 disabled:cursor-not-allowed", title: t('splitLineTooltip') },
                 CE(ScissorsIcon, { className: "w-4 h-4" }),
-                "Split Line"
+                t('splitLine')
               )
             )
           )
@@ -948,7 +1428,7 @@
       };
       
       // ** components/ContextMenu.tsx **
-      const ContextMenu = ({ x, y, entry, isFirst, isLast, onClose, onMove, onInsert, onMerge, onDelete }) => {
+      const ContextMenu = ({ x, y, entry, isFirst, isLast, onClose, onMove, onInsert, onMerge, onDelete, t }) => {
           const menuRef = useRef(null);
           const [position, setPosition] = useState({ top: y, left: x });
           useLayoutEffect(() => {
@@ -972,23 +1452,23 @@
               action();
               onClose();
           };
-          const MenuItem = ({ label, icon, onClick, disabled = false, className = '' }) => CE('button', { onClick: disabled ? undefined : () => handleAction(onClick), disabled, className: `w-full flex items-center px-4 py-2 text-sm text-left transition-colors duration-150 ${disabled ? 'text-gray-500 cursor-not-allowed' : 'text-gray-200 hover:bg-gray-700'} ${className}` },
+          const MenuItem = ({ label, icon, onClick, disabled = false, className = '' }) => CE('button', { onClick: disabled ? undefined : () => handleAction(onClick), disabled, className: `w-full flex items-center px-4 py-2 text-sm text-left transition-colors duration-150 ${disabled ? 'text-gray-600 cursor-not-allowed' : 'text-gray-200 hover:bg-gray-700'} ${className}` },
               CE('span', { className: "mr-3" }, icon),
               label
           );
           return CE('div', { ref: menuRef, style: { position: 'fixed', top: position.top, left: position.left, zIndex: 50 }, className: "w-56 bg-gray-800 border border-gray-700 rounded-md shadow-lg py-1" },
-              CE(MenuItem, { label: "Move Up", icon: CE(ArrowUpIcon, { className: "w-4 h-4" }), onClick: () => onMove(entry.index, 'up'), disabled: isFirst }),
-              CE(MenuItem, { label: "Move Down", icon: CE(ArrowDownIcon, { className: "w-4 h-4" }), onClick: () => onMove(entry.index, 'down'), disabled: isLast }),
+              CE(MenuItem, { label: t('moveUp'), icon: CE(ArrowUpIcon, { className: "w-4 h-4" }), onClick: () => onMove(entry.index, 'up'), disabled: isFirst }),
+              CE(MenuItem, { label: t('moveDown'), icon: CE(ArrowDownIcon, { className: "w-4 h-4" }), onClick: () => onMove(entry.index, 'down'), disabled: isLast }),
               CE('div', { className: "border-t border-gray-700 my-1" }),
-              CE(MenuItem, { label: "Insert Line Below", icon: CE(PlusIcon, { className: "w-4 h-4" }), onClick: () => onInsert(entry.index) }),
-              CE(MenuItem, { label: "Merge with Next", icon: CE(ChevronDoubleDownIcon, { className: "w-4 h-4" }), onClick: () => onMerge(entry.index), disabled: isLast }),
+              CE(MenuItem, { label: t('insertLineBelow'), icon: CE(PlusIcon, { className: "w-4 h-4" }), onClick: () => onInsert(entry.index) }),
+              CE(MenuItem, { label: t('mergeWithNext'), icon: CE(ChevronDoubleDownIcon, { className: "w-4 h-4" }), onClick: () => onMerge(entry.index), disabled: isLast }),
               CE('div', { className: "border-t border-gray-700 my-1" }),
-              CE(MenuItem, { label: "Delete", icon: CE(TrashIcon, { className: "w-4 h-4" }), onClick: () => onDelete(entry.index), className: "text-red-400 hover:bg-red-800/50" })
+              CE(MenuItem, { label: t('delete'), icon: CE(TrashIcon, { className: "w-4 h-4" }), onClick: () => onDelete(entry.index), className: "text-red-400 hover:bg-red-800/50" })
           );
       };
 
       // ** components/SrtDisplay.tsx **
-      const SrtDisplay = ({ entries, setEntries, isRefining, onSetTimeToCurrent, currentTime, onEntryClick, activeIndex, setActiveIndex }) => {
+      const SrtDisplay = ({ entries, setEntries, isRefining, onSetTimeToCurrent, currentTime, onEntryClick, activeIndex, setActiveIndex, t }) => {
         const [contextMenu, setContextMenu] = useState(null);
         const [draggedIndex, setDraggedIndex] = useState(null);
         const [dragOverIndex, setDragOverIndex] = useState(null);
@@ -1138,8 +1618,8 @@
         const allControlsDisabled = isRefining;
 
         return CE('div', { className: "flex flex-col relative flex-grow min-h-0", onClick: contextMenu ? closeContextMenu : undefined },
-          isRefining && CE('div', { className: "absolute inset-0 z-30 rounded-lg" }, CE(Loader, { message: "Refining timings..." })),
-          contextMenu && CE(ContextMenu, { x: contextMenu.x, y: contextMenu.y, entry: contextMenu.entry, isFirst: contextMenu.isFirst, isLast: contextMenu.isLast, onClose: closeContextMenu, onDelete: handleDelete, onInsert: handleInsert, onMerge: handleMerge, onMove: handleMove }),
+          isRefining && CE('div', { className: "absolute inset-0 z-30 rounded-lg" }, CE(Loader, { message: t('loadingRefining'), t })),
+          contextMenu && CE(ContextMenu, { x: contextMenu.x, y: contextMenu.y, entry: contextMenu.entry, isFirst: contextMenu.isFirst, isLast: contextMenu.isLast, onClose: closeContextMenu, onDelete: handleDelete, onInsert: handleInsert, onMerge: handleMerge, onMove: handleMove, t }),
           CE('div', { ref: scrollContainerRef, className: `p-2 transition-all flex-grow min-h-0 overflow-y-auto ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`, onClick: () => setActiveIndex(null) },
             CE('div', { className: "space-y-2", ref: listContainerRef },
               entries.map((entry, idx) => {
@@ -1166,6 +1646,7 @@
                   onDragOver: handleDragOver,
                   onDrop: handleDrop,
                   onDragEnd: handleDragEnd,
+                  t: t
                 });
               })
             )
@@ -1176,7 +1657,7 @@
       // ** components/InfoIconWithTooltip.tsx **
       const InfoIconWithTooltip = ({ text }) => {
           return CE('div', { className: "relative flex items-center group ml-2" },
-              CE(InformationCircleIcon, { className: "w-5 h-5 text-gray-500 hover:text-gray-300 cursor-help transition-colors" }),
+              CE(InformationCircleIcon, { className: "w-5 h-5 text-gray-400 hover:text-gray-300 cursor-help transition-colors" }),
               CE('div', {
                   className: "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 text-sm text-left text-gray-200 bg-gray-800 border border-gray-600 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 pointer-events-none z-50",
                   role: "tooltip"
@@ -1233,11 +1714,26 @@
         const [currentTime, setCurrentTime] = useState(0);
         const [activeIndex, setActiveIndex] = useState(null);
         const [importedFileName, setImportedFileName] = useState(null);
+        const [language, setLanguage] = useState(getInitialLang);
+        const [contentLanguage, setContentLanguage] = useState(language);
+        const [detectedFormat, setDetectedFormat] = useState(null);
+        
+        const t = useCallback((key, replacements = {}) => {
+          let text = translations[language]?.[key] || translations.en[key] || key;
+          Object.entries(replacements).forEach(([k, v]) => {
+              text = text.replace(`{${k}}`, String(v));
+          });
+          return text;
+        }, [language]);
 
         const videoRef = useRef(null);
         const downloadMenuRef = useRef(null);
         const subtitleInputRef = useRef(null);
         const isLoading = activeProcess !== null;
+        
+        useEffect(() => {
+            document.documentElement.lang = language;
+        }, [language]);
 
         useEffect(() => {
           try {
@@ -1254,11 +1750,6 @@
             console.error("Failed to load or parse draft from localStorage", e);
             localStorage.removeItem('srtLyricSyncDraft');
           }
-        }, []);
-
-        useEffect(() => {
-          const userLang = navigator.language || (navigator.languages && navigator.languages[0]);
-          if (userLang) console.log(`SRT Lyric Sync: User browser language detected - ${userLang}`);
         }, []);
 
         useEffect(() => {
@@ -1284,6 +1775,23 @@
           setVideoUrl(objectUrl);
           return () => URL.revokeObjectURL(objectUrl);
         }, [videoFile]);
+        
+        useEffect(() => {
+            const trimmedLyrics = lyrics.trim();
+            if (trimmedLyrics.length < 15) {
+                setDetectedFormat(null);
+                return;
+            }
+            if (/^\d+\r?\n\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/m.test(trimmedLyrics)) {
+                setDetectedFormat('srt');
+            } else if (/^WEBVTT/m.test(trimmedLyrics)) {
+                setDetectedFormat('vtt');
+            } else if (/^\[\d{2}:\d{2}\.\d{2,3}\]/m.test(trimmedLyrics)) {
+                setDetectedFormat('lrc');
+            } else {
+                setDetectedFormat(null);
+            }
+        }, [lyrics]);
 
         useEffect(() => {
           const handleKeyDown = (event) => {
@@ -1310,7 +1818,7 @@
 
         const handleTranscribe = useCallback(async () => {
           if (!videoFile) {
-            setError("Please upload a media file before transcribing.");
+            setError(t('errorMediaNeededForGenerate'));
             return;
           }
           setActiveProcess('transcribe');
@@ -1319,27 +1827,32 @@
           setOffset(0);
           setEndTimePadding(0);
           setImportedFileName(null);
+          setContentLanguage(language);
           try {
-            setLoadingMessage("Step 1/3: Transcribing audio...");
+            setLoadingMessage(t('loadingTranscribingStep1'));
             const videoBase64 = await fileToBase64(videoFile);
             const transcribedText = await transcribeAudio(videoBase64, videoFile.type);
             setLyrics(transcribedText);
-            setLoadingMessage("Step 2/3: Analyzing audio & syncing lyrics...");
+            const detectedLang = await detectLanguage(transcribedText);
+            if (detectedLang) {
+                setContentLanguage(detectedLang);
+            }
+            setLoadingMessage(t('loadingTranscribingStep2'));
             const initialSrtData = await generateSrtFromVideoAndLyrics(videoBase64, videoFile.type, transcribedText);
-            setLoadingMessage("Step 3/3: Refining timings for accuracy...");
+            setLoadingMessage(t('loadingTranscribingStep3'));
             const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
             resetSrtEntries(refinedSrtData);
             const updatedLyrics = refinedSrtData.map(entry => entry.text).join('\n');
             setLyrics(updatedLyrics);
           } catch (e) {
             console.error(e);
-            const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-            setError(`Failed to process: ${errorMessage}`);
+            const errorMessage = e instanceof Error ? e.message : t('errorGeneric');
+            setError(t('errorFailedToProcess', {error: errorMessage}));
           } finally {
             setActiveProcess(null);
             setLoadingMessage('');
           }
-        }, [videoFile, resetSrtEntries, setLyrics]);
+        }, [videoFile, resetSrtEntries, setLyrics, t, language]);
 
         const handleFileSelect = useCallback((file) => {
           if (!file) {
@@ -1347,21 +1860,21 @@
             return;
           }
           if (file.size > MAX_FILE_SIZE_BYTES) {
-            setError(`File is too large. Please select a file smaller than ${MAX_FILE_SIZE_MB}MB.`);
+            setError(t('errorFileTooLarge', {size: MAX_FILE_SIZE_MB}));
             setVideoFile(null);
             return;
           }
           setError(null);
           setVideoFile(file);
-        }, []);
+        }, [t]);
 
         const handleGenerateSrt = useCallback(async (lyricsToGenerate) => {
           if (!videoFile) {
-            setError("Please upload a media file before generating subtitles.");
+            setError(t('errorMediaNeededForGenerate'));
             return;
           }
           if (!lyricsToGenerate.trim()) {
-            setError("Lyrics are empty. Please provide lyrics to generate subtitles.");
+            setError(t('errorLyricsNeededForGenerate'));
             return;
           }
           setActiveProcess('generate');
@@ -1370,23 +1883,25 @@
           setOffset(0);
           setEndTimePadding(0);
           try {
-            setLoadingMessage("Step 1/2: Analyzing audio & syncing lyrics...");
+            const detectedLang = await detectLanguage(lyricsToGenerate);
+            setContentLanguage(detectedLang || language);
+            setLoadingMessage(t('loadingGeneratingStep1'));
             const videoBase64 = await fileToBase64(videoFile);
             const initialSrtData = await generateSrtFromVideoAndLyrics(videoBase64, videoFile.type, lyricsToGenerate);
-            setLoadingMessage("Step 2/2: Refining timings for accuracy...");
+            setLoadingMessage(t('loadingGeneratingStep2'));
             const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
             resetSrtEntries(refinedSrtData);
             const updatedLyrics = refinedSrtData.map(entry => entry.text).join('\n');
             setLyrics(updatedLyrics);
           } catch (e) {
             console.error(e);
-            const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-            setError(`Failed to process: ${errorMessage}`);
+            const errorMessage = e instanceof Error ? e.message : t('errorGeneric');
+            setError(t('errorFailedToProcess', {error: errorMessage}));
           } finally {
             setActiveProcess(null);
             setLoadingMessage('');
           }
-        }, [videoFile, resetSrtEntries, setLyrics]);
+        }, [videoFile, resetSrtEntries, setLyrics, t, language]);
 
         const handleGenerate = useCallback(() => {
           setImportedFileName(null);
@@ -1395,11 +1910,11 @@
 
         const handleRefineTimings = useCallback(async () => {
           if (!videoFile) {
-            setError("Please upload the media file to use the refine feature.");
+            setError(t('errorMediaNeededForRefine'));
             return;
           }
           if (srtEntries.length === 0) {
-            setError("There are no subtitles to refine.");
+            setError(t('errorNoSubtitlesToRefine'));
             return;
           }
           setIsRefining(true);
@@ -1412,16 +1927,23 @@
             setEndTimePadding(0);
           } catch (e) {
             console.error(e);
-            const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-            setError(`Failed to refine timings: ${errorMessage}`);
+            const errorMessage = e instanceof Error ? e.message : t('errorGeneric');
+            setError(t('errorFailedToProcess', {error: errorMessage}));
           } finally {
             setIsRefining(false);
           }
-        }, [videoFile, srtEntries, setSrtEntries]);
+        }, [videoFile, srtEntries, setSrtEntries, t]);
+
+        const languageNameToCodeMap = {
+            'English': 'en', 'Spanish': 'es', 'French': 'fr', 'German': 'de', 
+            'Italian': 'it', 'Portuguese': 'pt', 'Dutch': 'nl', 'Russian': 'ru', 
+            'Chinese (Simplified)': 'zh-CN', 'Japanese': 'ja', 'Korean': 'ko', 
+            'Arabic': 'ar', 'Hindi': 'hi'
+        };
 
         const handleTranslate = useCallback(async () => {
           if (srtEntries.length === 0) {
-            setError("There are no subtitles to translate.");
+            setError(t('errorNoSubtitlesToTranslate'));
             return;
           }
           setIsTranslating(true);
@@ -1429,14 +1951,16 @@
           try {
             const translatedSrtData = await translateSrtText(srtEntries, targetLanguage);
             setSrtEntries(translatedSrtData);
+            const langCode = languageNameToCodeMap[targetLanguage] || 'en';
+            setContentLanguage(langCode);
           } catch (e) {
             console.error(e);
-            const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-            setError(`Failed to translate subtitles: ${errorMessage}`);
+            const errorMessage = e instanceof Error ? e.message : t('errorGeneric');
+            setError(t('errorFailedToProcess', {error: errorMessage}));
           } finally {
             setIsTranslating(false);
           }
-        }, [srtEntries, targetLanguage, setSrtEntries]);
+        }, [srtEntries, targetLanguage, setSrtEntries, t]);
 
         const handleOffsetChange = (newOffsetValue) => {
           const diff = newOffsetValue - offset;
@@ -1511,7 +2035,8 @@
             setOffset(draftToRestore.offset || 0);
             setEndTimePadding(draftToRestore.endTimePadding || 0);
             setImportedFileName(null);
-            setError("Draft restored. Please re-upload the original media file to use the preview and refine functions.");
+            setContentLanguage(language);
+            setError(t('draftRestored'));
             setTimeout(() => setError(null), 6000);
           }
           setDraftToRestore(null);
@@ -1522,15 +2047,17 @@
         };
         const handleImportSubtitles = (file) => {
           const reader = new FileReader();
-          reader.onload = (e) => {
+          reader.onload = async (e) => {
             const content = e.target?.result;
             if (!content) {
-              setError('File is empty or could not be read.');
+              setError(t('errorFileEmpty'));
               return;
             }
             try {
               const extension = file.name.split('.').pop()?.toLowerCase();
               if (extension === 'txt') {
+                const detectedLang = await detectLanguage(content);
+                setContentLanguage(detectedLang || language);
                 setError(null);
                 setLyrics(content);
                 setImportedFileName(file.name);
@@ -1545,14 +2072,17 @@
                 case 'srt': parsedEntries = parseSrt(content); break;
                 case 'vtt': parsedEntries = parseVtt(content); break;
                 case 'lrc': parsedEntries = parseLrc(content); break;
-                default: setError(`Unsupported file type: .${extension}`); return;
+                default: setError(t('errorUnsupportedFileType', {extension})); return;
               }
               if (parsedEntries.length === 0) {
-                setError('No valid subtitle entries found in the file.');
+                setError(t('errorNoEntriesFound'));
                 return;
               }
+              const fullText = parsedEntries.map(entry => entry.text).join('\n');
+              const detectedLang = await detectLanguage(fullText);
+              setContentLanguage(detectedLang || language);
               setError(null);
-              setLyrics('');
+              setLyrics(fullText);
               resetSrtEntries(parsedEntries);
               setOffset(0);
               setEndTimePadding(0);
@@ -1560,7 +2090,7 @@
             } catch (err) {
               console.error('Error parsing subtitle file:', err);
               const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-              setError(`Failed to parse file: ${errorMessage}`);
+              setError(t('errorFailedToParseFile', {error: errorMessage}));
               setImportedFileName(null);
             }
           };
@@ -1577,6 +2107,36 @@
             e.target.value = '';
           }
         };
+        const handleParseFromLyrics = async () => {
+            if (!detectedFormat) return;
+            try {
+                let parsedEntries = [];
+                switch (detectedFormat) {
+                    case 'srt': parsedEntries = parseSrt(lyrics); break;
+                    case 'vtt': parsedEntries = parseVtt(lyrics); break;
+                    case 'lrc': parsedEntries = parseLrc(lyrics); break;
+                    default: return;
+                }
+                if (parsedEntries.length === 0) {
+                    setError(t('errorNoEntriesFound'));
+                    return;
+                }
+                const fullText = parsedEntries.map(entry => entry.text).join('\n');
+                const detectedLang = await detectLanguage(fullText);
+                setContentLanguage(detectedLang || language);
+                setError(null);
+                setLyrics(fullText);
+                resetSrtEntries(parsedEntries);
+                setOffset(0);
+                setEndTimePadding(0);
+                setImportedFileName(null);
+                setDetectedFormat(null);
+            } catch (err) {
+                console.error('Error parsing pasted lyrics:', err);
+                const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+                setError(t('errorFailedToParseFile', { error: errorMessage }));
+            }
+        };
         const downloadFile = (content, fileName, mimeType) => {
           const bom = '\uFEFF';
           const blob = new Blob([bom + content], { type: `${mimeType};charset=utf-8` });
@@ -1592,11 +2152,12 @@
         const handleDownload = (format) => {
           const getBaseName = () => videoFile?.name.substring(0, videoFile.name.lastIndexOf('.')) || importedFileName?.substring(0, importedFileName.lastIndexOf('.')) || 'lyrics';
           const baseName = getBaseName();
+          const langCode = contentLanguage.split('-')[0];
           let content = '', fileName = '', mimeType = 'text/plain';
           switch (format) {
-            case 'srt': content = serializeSrt(srtEntries); fileName = `${baseName}.srt`; break;
-            case 'vtt': content = srtToVtt(serializeSrt(srtEntries)); fileName = `${baseName}.vtt`; mimeType = 'text/vtt'; break;
-            case 'lrc': content = serializeLrc(srtEntries); fileName = `${baseName}.lrc`; break;
+            case 'srt': content = serializeSrt(srtEntries); fileName = `${baseName}_${langCode}.srt`; break;
+            case 'vtt': content = srtToVtt(serializeSrt(srtEntries)); fileName = `${baseName}_${langCode}.vtt`; mimeType = 'text/vtt'; break;
+            case 'lrc': content = serializeLrc(srtEntries); fileName = `${baseName}_${langCode}.lrc`; break;
           }
           downloadFile(content, fileName, mimeType);
           setIsDownloadMenuOpen(false);
@@ -1606,24 +2167,34 @@
         const canGenerate = videoFile !== null && lyrics.trim().length > 0 && !allControlsDisabled;
         const canTranscribe = videoFile !== null && !allControlsDisabled;
         const isAudio = videoFile?.type.startsWith('audio/');
-        const uploadBoxTitle = videoFile ? (isAudio ? '1. Preview Audio' : '1. Preview Video') : '1. Upload Video or Audio';
+        const uploadBoxTitle = videoFile ? (isAudio ? t('previewHeaderAudio') : t('previewHeaderVideo')) : t('uploadHeader');
         const containerClasses = 'bg-gray-900 text-white font-sans flex flex-col min-h-screen lg:h-screen lg:overflow-hidden';
 
         return CE('div', { className: containerClasses },
           draftToRestore && CE('div', { className: "bg-gray-800 border-b border-teal-800 text-center p-3 flex justify-center items-center gap-4 text-sm shadow-lg flex-shrink-0" },
             CE(ArchiveBoxIcon, { className: "w-6 h-6 text-teal-400 flex-shrink-0" }),
-            CE('p', { className: "text-gray-300" }, "Found an unsaved draft", draftToRestore.videoFileName && CE('span', { className: "font-semibold text-white" }, ` for "${draftToRestore.videoFileName}"`), ". Would you like to restore it?"),
-            CE('button', { onClick: handleRestoreDraft, className: "px-4 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-md font-semibold transition-colors" }, "Restore"),
-            CE('button', { onClick: handleDismissDraft, className: "px-4 py-1.5 hover:bg-gray-700 rounded-md text-gray-400 hover:text-white transition-colors" }, "Dismiss")
+            CE('p', { className: "text-gray-300" }, t('draftFound'), draftToRestore.videoFileName && CE('span', { className: "font-semibold text-white" }, t('draftForFile', {fileName: draftToRestore.videoFileName})), t('draftQuery')),
+            CE('button', { onClick: handleRestoreDraft, className: "px-4 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-md font-semibold transition-colors" }, t('draftRestore')),
+            CE('button', { onClick: handleDismissDraft, className: "px-4 py-1.5 hover:bg-gray-700 rounded-md text-gray-400 hover:text-white transition-colors" }, t('draftDismiss'))
           ),
           CE('main', { className: "max-w-7xl mx-auto w-full flex flex-col flex-grow p-4 min-h-0" },
             CE('header', { className: "text-center my-6 flex-shrink-0" },
               CE('div', { className: "flex items-center justify-center gap-1" },
                   CE('h1', { className: "text-lg md:text-xl font-semibold tracking-tight text-gray-300 flex flex-wrap justify-center items-center gap-x-2 px-2" },
-                    CE('span', { className: "font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500" }, "SRT Lyric Sync"),
-                    CE('span', { className: "text-xs md:text-sm text-gray-400 font-normal" }, "AI-powered subtitle synchronization")
+                    CE('span', { className: "font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500" }, t('appTitle')),
+                    CE('span', { className: "text-xs md:text-sm text-gray-400 font-normal" }, t('appSubtitle'))
                   ),
-                  CE(InfoIconWithTooltip, { text: "This tool uses AI to synchronize lyrics with an audio or video file, creating subtitle files (SRT, VTT, LRC). You can either provide lyrics or have the AI transcribe them for you." })
+                  CE(InfoIconWithTooltip, { text: t('appDescriptionTooltip') }),
+                  CE('select', { 
+                      value: language, 
+                      onChange: e => setLanguage(e.target.value),
+                      className: "ml-4 bg-gray-800 border border-gray-600 text-white text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 p-2",
+                      "aria-label": t('languageSelectorLabel')
+                    },
+                    supportedLanguages.map(lang => 
+                      CE('option', { key: lang.code, value: lang.code }, lang.name)
+                    )
+                  )
               )
             ),
             CE('div', { className: "grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch flex-grow min-h-0" },
@@ -1632,106 +2203,112 @@
                   CE('div', { className: "flex items-center justify-between mb-4 flex-wrap gap-2" },
                     CE('div', { className: "flex items-center" },
                       CE('h2', { className: "text-lg font-semibold text-gray-200" }, uploadBoxTitle),
-                      CE(InfoIconWithTooltip, { text: "Upload your video (MP4, MOV) or audio (MP3, WAV) file. Max size: 15MB. The file is processed in your browser and is not uploaded to any server for storage." })
+                      CE(InfoIconWithTooltip, { text: t('uploadTooltip') })
                     ),
                     videoFile && CE('span', { className: "text-sm text-gray-400 truncate ml-2", title: videoFile.name }, videoFile.name)
                   ),
-                  CE(FileUpload, { videoFile, setVideoFile: handleFileSelect, disabled: allControlsDisabled, videoUrl })
+                  CE(FileUpload, { videoFile, setVideoFile: handleFileSelect, disabled: allControlsDisabled, videoUrl, t })
                 ),
                 CE('div', { className: "p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col flex-grow min-h-0" },
                   CE('div', { className: "flex justify-between items-center mb-4 flex-wrap gap-y-2" },
                     CE('div', { className: "flex items-center" },
-                       CE('h2', { className: "text-lg font-semibold text-gray-200" }, "2. Provide Lyrics"),
-                       CE(InfoIconWithTooltip, { text: "1) Paste lyrics directly. 2) Import a text file (.txt) or subtitle file (.srt, .vtt, .lrc). 3) Click 'Transcribe' to let AI generate lyrics and subtitles from your media file in one go." })
+                       CE('h2', { className: "text-lg font-semibold text-gray-200" }, t('lyricsHeader')),
+                       CE(InfoIconWithTooltip, { text: t('lyricsTooltip') })
                     ),
                     CE('div', { className: "flex items-center gap-2" },
-                      CE('button', { onClick: handleImportClick, disabled: allControlsDisabled, className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed", title: "Import subtitles from a file (.srt, .vtt, .lrc, .txt)" }, CE(UploadIcon, { className: "w-5 h-5" }), "Import"),
+                      CE('button', { onClick: handleImportClick, disabled: allControlsDisabled, className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed", title: t('importTooltip') }, CE(UploadIcon, { className: "w-5 h-5" }), t('import')),
                       CE('input', { type: "file", ref: subtitleInputRef, onChange: handleSubtitleFileChange, accept: ".srt,.vtt,.lrc,.txt", className: "hidden", disabled: allControlsDisabled }),
-                      CE('button', { onClick: handleTranscribe, disabled: !canTranscribe, className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed", title: canTranscribe ? "Transcribe audio and generate subtitles in one step." : "Upload a media file to enable transcription." }, CE(MicrophoneIcon, { className: "w-5 h-5" }), activeProcess === 'transcribe' ? 'Processing...' : 'Transcribe'),
-                      CE('button', { onClick: handleGenerate, disabled: !canGenerate, className: "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out bg-teal-600 hover:bg-teal-500 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none", title: canGenerate ? "Generate synchronized subtitles from your lyrics and media file." : "Upload a media file and provide lyrics to enable." }, CE(SparklesIcon, { className: "w-5 h-5" }), activeProcess === 'generate' ? 'Generating...' : 'Generate')
+                      CE('button', { onClick: handleTranscribe, disabled: !canTranscribe, className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed", title: canTranscribe ? t('transcribeTooltip') : t('transcribeDisabledTooltip') }, CE(MicrophoneIcon, { className: "w-5 h-5" }), activeProcess === 'transcribe' ? t('transcribeActive') : t('transcribe')),
+                      CE('button', { onClick: handleGenerate, disabled: !canGenerate, className: "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out bg-teal-600 hover:bg-teal-500 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none", title: canGenerate ? t('generateTooltip') : t('generateDisabledTooltip') }, CE(SparklesIcon, { className: "w-5 h-5" }), activeProcess === 'generate' ? t('generateActive') : t('generate'))
                     )
                   ),
-                  CE(LyricsInput, { lyrics, setLyrics, disabled: allControlsDisabled })
+                  CE(LyricsInput, { lyrics, setLyrics, disabled: allControlsDisabled, t }),
+                  detectedFormat && !allControlsDisabled && CE('div', { className: "mt-3 text-center" },
+                    CE('button', {
+                        onClick: handleParseFromLyrics,
+                        className: "w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/50"
+                    }, CE(EditIcon, { className: "w-5 h-5" }), t('detectedFormatLoad', { format: detectedFormat.toUpperCase() }))
+                  )
                 )
               ),
               CE('div', { className: "lg:col-span-3 p-5 bg-gray-800/50 rounded-xl shadow-lg border border-gray-700 flex flex-col gap-4 min-h-0 h-screen lg:h-auto" },
                 CE('div', { className: "flex justify-between items-center flex-wrap gap-2" },
                   CE('div', { className: "flex items-center min-w-0" },
-                    CE('h2', { className: "text-lg font-semibold text-gray-200 flex-shrink-0" }, "3. Edit Your Subtitles"),
-                    CE(InfoIconWithTooltip, { text: "Review and edit your subtitles. Click on a subtitle to jump to that time in the video. Use the tools to refine timings, translate, adjust global offsets, or download the final file." }),
+                    CE('h2', { className: "text-lg font-semibold text-gray-200 flex-shrink-0" }, t('editorHeader')),
+                    CE(InfoIconWithTooltip, { text: t('editorTooltip') }),
                     importedFileName && CE('span', { className: "text-sm text-gray-400 truncate ml-2", title: importedFileName }, importedFileName)
                   ),
                   CE('div', { className: "flex items-center flex-wrap justify-end gap-2" },
                     CE('div', { className: "flex items-center", role: "group" },
-                      CE('button', { onClick: undo, disabled: !canUndo || allControlsDisabled, className: "p-2 rounded-l-md bg-gray-700 hover:bg-gray-600 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: "Undo" }, CE(UndoIcon, { className: "w-5 h-5" })),
-                      CE('button', { onClick: redo, disabled: !canRedo || allControlsDisabled, className: "p-2 rounded-r-md bg-gray-700 hover:bg-gray-600 border-l border-gray-800 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: "Redo" }, CE(RedoIcon, { className: "w-5 h-5" }))
+                      CE('button', { onClick: undo, disabled: !canUndo || allControlsDisabled, className: "p-2 rounded-l-md bg-gray-700 hover:bg-gray-600 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: t('undo') }, CE(UndoIcon, { className: "w-5 h-5" })),
+                      CE('button', { onClick: redo, disabled: !canRedo || allControlsDisabled, className: "p-2 rounded-r-md bg-gray-700 hover:bg-gray-600 border-l border-gray-800 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: t('redo') }, CE(RedoIcon, { className: "w-5 h-5" }))
                     ),
                     CE('div', { className: "flex items-center shadow-md", role: "group" },
                       CE('select', {
                         value: targetLanguage,
                         onChange: e => setTargetLanguage(e.target.value),
                         disabled: allControlsDisabled || srtEntries.length === 0,
-                        className: "py-2 pl-3 pr-8 text-sm bg-gray-700 hover:bg-gray-600 rounded-l-md border-r border-gray-800 text-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-                        "aria-label": "Select language to translate to",
-                        title: "Select language for translation"
+                        className: "py-2 pl-3 pr-8 text-sm bg-gray-700 hover:bg-gray-600 rounded-l-md border-r border-gray-800 text-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-36",
+                        "aria-label": t('languageSelectLabelDropdown'),
+                        title: t('languageSelectLabelDropdown')
                       },
                         ['English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Dutch', 'Russian', 'Chinese (Simplified)', 'Japanese', 'Korean', 'Arabic', 'Hindi'].map(lang => CE('option', { key: lang, value: lang }, lang))
                       ),
                       CE('button', {
                         onClick: handleTranslate,
                         disabled: allControlsDisabled || srtEntries.length === 0,
-                        className: "flex items-center gap-2 p-2 sm:px-3 text-sm bg-gray-700 hover:bg-gray-600 rounded-r-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed",
-                        title: `Translate to ${targetLanguage}`
+                        className: "flex items-center gap-2 p-2 lg:px-3 text-sm bg-gray-700 hover:bg-gray-600 rounded-r-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed",
+                        title: t('translateTooltip', {language: targetLanguage})
                       },
-                        CE(LanguageIcon, { className: "w-5 h-5 sm:mr-2" }),
-                        CE('span', { className: "hidden sm:inline" }, isTranslating ? 'Translating...' : 'Translate')
+                        CE(LanguageIcon, { className: "w-5 h-5" }),
+                        CE('span', { className: "hidden lg:inline" }, isTranslating ? t('translateActive') : t('translate'))
                       )
                     ),
-                    CE('button', { onClick: handleRefineTimings, disabled: allControlsDisabled || !videoFile || srtEntries.length === 0, className: "flex items-center p-2 sm:px-3 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed", title: "Use AI to improve timing accuracy" }, CE(SparklesIcon, { className: "w-5 h-5 sm:mr-2" }), CE('span', { className: "hidden sm:inline" }, "Refine")),
+                    CE('button', { onClick: handleRefineTimings, disabled: allControlsDisabled || !videoFile || srtEntries.length === 0, className: "flex items-center gap-2 p-2 lg:px-3 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed", title: t('refineTooltip') }, CE(SparklesIcon, { className: "w-5 h-5" }), CE('span', { className: "hidden lg:inline" }, t('refine'))),
                     CE('div', { className: "relative inline-flex shadow-md", ref: downloadMenuRef },
-                      CE('button', { onClick: () => handleDownload('srt'), disabled: srtEntries.length === 0 || allControlsDisabled, className: "flex items-center p-2 sm:px-3 sm:py-2 text-sm bg-teal-600 hover:bg-teal-500 rounded-l-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed", title: "Download SRT file" }, CE(DownloadIcon, { className: "w-5 h-5 sm:mr-2" }), CE('span', { className: "hidden sm:inline" }, "Download SRT")),
-                      CE('button', { onClick: () => setIsDownloadMenuOpen(prev => !prev), disabled: srtEntries.length === 0 || allControlsDisabled, className: "p-2 sm:px-1.5 bg-teal-600 hover:bg-teal-500 rounded-r-md border-l border-teal-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed", title: "More download options" }, CE(ChevronDownIcon, { className: "w-5 h-5" })),
+                      CE('button', { onClick: () => handleDownload('srt'), disabled: srtEntries.length === 0 || allControlsDisabled, className: "flex items-center gap-2 p-2 lg:px-3 text-sm bg-teal-600 hover:bg-teal-500 rounded-l-md transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed", title: t('downloadSRTTooltip') }, CE(DownloadIcon, { className: "w-5 h-5" }), CE('span', { className: "hidden lg:inline" }, t('downloadSRT'))),
+                      CE('button', { onClick: () => setIsDownloadMenuOpen(prev => !prev), disabled: srtEntries.length === 0 || allControlsDisabled, className: "p-2 md:px-1.5 bg-teal-600 hover:bg-teal-500 rounded-r-md border-l border-teal-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed", title: t('moreDownloads') }, CE(ChevronDownIcon, { className: "w-5 h-5" })),
                       isDownloadMenuOpen && CE('div', { className: "absolute right-0 top-full mt-2 w-40 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600 overflow-hidden" },
-                        CE('a', { onClick: () => handleDownload('vtt'), className: "block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer" }, "Download VTT"),
-                        CE('a', { onClick: () => handleDownload('lrc'), className: "block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer" }, "Download LRC")
+                        CE('a', { onClick: () => handleDownload('vtt'), className: "block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer" }, t('downloadVTT')),
+                        CE('a', { onClick: () => handleDownload('lrc'), className: "block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 cursor-pointer" }, t('downloadLRC'))
                       )
                     )
                   )
                 ),
                 CE('div', { className: "bg-gray-900/70 rounded-lg relative flex flex-col flex-grow min-h-0" },
-                  isLoading && CE(Loader, { message: loadingMessage }),
+                  isLoading && CE(Loader, { message: loadingMessage, t }),
                   !isLoading && error && CE('div', { className: "flex items-center justify-center h-full text-center text-red-400 p-4" }, CE('p', null, error)),
                   !isLoading && !error && srtEntries.length > 0 && videoFile && videoUrl ? CE('div', { className: "flex flex-col flex-grow min-h-0" },
-                    CE('div', { className: "relative bg-black flex-shrink-0 border-b-2 border-gray-700/50 max-h-[35vh] p-2" }, CE(VideoPreview, { ref: videoRef, videoFile, videoUrl, entries: srtEntries, onTimeUpdate: setCurrentTime })),
+                    CE('div', { className: "relative bg-black flex-shrink-0 border-b-2 border-gray-700/50 max-h-[35vh] p-2" }, CE(VideoPreview, { ref: videoRef, videoFile, videoUrl, entries: srtEntries, onTimeUpdate: setCurrentTime, t })),
                     CE('div', { className: `p-3 bg-gray-900/50 border-b border-gray-700 transition-all flex-shrink-0 ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}` },
                       CE('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4" },
                         CE('div', { className: "flex-1 min-w-[280px]" },
-                          CE('label', { htmlFor: "timing-offset-slider", className: "block text-sm font-medium text-gray-300 mb-2", title: "Shift all subtitle timestamps forward or backward simultaneously." }, "Global Timing Offset"),
+                          CE('label', { htmlFor: "timing-offset-slider", className: "block text-sm font-medium text-gray-300 mb-2", title: t('globalOffsetTooltip') }, t('globalOffset')),
                           CE('div', { className: "flex items-center gap-3" },
                             CE('input', { id: "timing-offset-slider", type: "range", min: "-2000", max: "2000", step: "10", value: offset, onChange: (e) => handleOffsetChange(parseInt(e.target.value, 10)), className: "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50", disabled: allControlsDisabled, title: `${offset}ms` }),
                             CE('input', { type: "number", value: offset, onChange: (e) => handleOffsetChange(parseInt(e.target.value, 10) || 0), className: "w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50", step: "10", "aria-label": "Timing offset in milliseconds", disabled: allControlsDisabled }),
-                            CE('button', { onClick: () => handleOffsetChange(0), disabled: offset === 0 || allControlsDisabled, className: "p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: "Reset offset" }, CE(ArrowPathIcon, { className: "w-5 h-5" }))
+                            CE('button', { onClick: () => handleOffsetChange(0), disabled: offset === 0 || allControlsDisabled, className: "p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: t('resetOffset') }, CE(ArrowPathIcon, { className: "w-5 h-5" }))
                           )
                         ),
                         CE('div', { className: "flex-1 min-w-[280px]" },
-                          CE('label', { htmlFor: "end-time-padding-slider", className: "block text-sm font-medium text-gray-300 mb-2", title: "Adds a small delay to the end of each subtitle to account for vocal decay." }, "Vocal Decay Helper (End Time Padding)"),
+                          CE('label', { htmlFor: "end-time-padding-slider", className: "block text-sm font-medium text-gray-300 mb-2", title: t('vocalDecayTooltip') }, t('vocalDecay')),
                           CE('div', { className: "flex items-center gap-3" },
                             CE('input', { id: "end-time-padding-slider", type: "range", min: "-2000", max: "2000", step: "10", value: endTimePadding, onChange: (e) => handleEndTimePaddingChange(parseInt(e.target.value, 10)), className: "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50", disabled: allControlsDisabled, title: `${endTimePadding >= 0 ? '+' : ''}${endTimePadding}ms` }),
                             CE('input', { type: "number", value: endTimePadding, onChange: (e) => handleEndTimePaddingChange(parseInt(e.target.value, 10) || 0), className: "w-24 bg-gray-700 text-center p-1 rounded border border-gray-600 disabled:opacity-50", step: "10", "aria-label": "End time padding in milliseconds", disabled: allControlsDisabled }),
-                            CE('button', { onClick: () => handleEndTimePaddingChange(0), disabled: endTimePadding === 0 || allControlsDisabled, className: "p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: "Reset padding" }, CE(ArrowPathIcon, { className: "w-5 h-5" }))
+                            CE('button', { onClick: () => handleEndTimePaddingChange(0), disabled: endTimePadding === 0 || allControlsDisabled, className: "p-2 rounded-md hover:bg-gray-700 transition-colors text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed", title: t('resetPadding') }, CE(ArrowPathIcon, { className: "w-5 h-5" }))
                           )
                         )
                       )
                     ),
-                    CE('div', { className: "flex-grow min-h-0 flex flex-col" }, CE(SrtDisplay, { entries: srtEntries, setEntries: setSrtEntries, isRefining, onSetTimeToCurrent: handleSetTimeToCurrent, currentTime, onEntryClick: handleEntryClick, activeIndex, setActiveIndex }))
-                  ) : (!isLoading && !error && srtEntries.length === 0 && CE('div', { className: "flex items-center justify-center h-full text-center text-gray-500 p-4" }, CE('p', null, "Your generated SRT file will appear here."))),
-                  !isLoading && !error && srtEntries.length > 0 && !videoFile && CE('div', { className: "flex flex-col items-center justify-center h-full text-center text-red-400 p-4" }, CE('p', { className: "font-semibold text-lg" }, "Media File Missing"), CE('p', { className: "mt-2 text-gray-300" }, "Please re-upload the original media file to edit and preview the subtitles."))
+                    CE('div', { className: "flex-grow min-h-0 flex flex-col" }, CE(SrtDisplay, { entries: srtEntries, setEntries: setSrtEntries, isRefining, onSetTimeToCurrent: handleSetTimeToCurrent, currentTime, onEntryClick: handleEntryClick, activeIndex, setActiveIndex, t }))
+                  ) : (!isLoading && !error && srtEntries.length === 0 && CE('div', { className: "flex items-center justify-center h-full text-center text-gray-400 p-4" }, CE('p', null, t('placeholder')))),
+                  !isLoading && !error && srtEntries.length > 0 && !videoFile && CE('div', { className: "flex flex-col items-center justify-center h-full text-center text-red-400 p-4" }, CE('p', { className: "font-semibold text-lg" }, t('mediaMissing')), CE('p', { className: "mt-2 text-gray-300" }, t('mediaMissingDescription')))
                 )
               )
             )
           ),
-          CE('footer', { className: "text-center py-4 text-gray-500 text-sm flex-shrink-0" },
-            CE('p', null, "Powered by Google Gemini")
+          CE('footer', { className: "text-center py-4 text-gray-400 text-sm flex-shrink-0" },
+            CE('p', null, t('poweredBy'))
           )
         );
       };

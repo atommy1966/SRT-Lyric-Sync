@@ -12,6 +12,7 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 *   **AI-Powered Transcription & Sync**:
     *   **One-Click Transcription**: Don't have the lyrics? Let the AI transcribe the audio for you directly into the editor and generate synchronized subtitles in a single step.
     *   **Automatic Synchronization**: If you already have lyrics, just paste them in and let the AI create a perfectly synchronized subtitle file in seconds.
+*   **Multilingual Interface**: Enjoy a fully localized experience with support for English, Japanese, Spanish, and Chinese.
 *   **One-Click Translation**: Instantly translate your subtitles into multiple languages using the integrated AI translation tool. Perfect for reaching a global audience.
 *   **High-Precision AI Refinement**: Fine-tune generated timings with a single click. The AI analyzes vocal decay and phrasing for professional-grade accuracy.
 *   **Advanced Interactive Editor**:
@@ -27,6 +28,8 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 *   **Flexible I/O & Workflow**:
     *   **Real-time Video Preview**: See your edits reflected instantly on the custom video player. The subtitle list automatically scrolls to the currently playing line.
     *   **Multi-Format Support**: Import from `.txt`, `.srt`, `.vtt`, and `.lrc` files. Export your work to SRT, VTT, or LRC with the streamlined download menu.
+    *   **Smart Filename Generation**: The app automatically detects the language of your subtitles and includes the language code (e.g., `_ja.srt`) in the downloaded filename for easy organization.
+    *   **Paste-to-Parse**: Paste raw SRT, VTT, or LRC content directly into the lyrics area, and the app will automatically detect the format and offer to load it into the editor with one click.
     *   **Draft Autosave & Restore**: Your progress is automatically saved in your browser. If you leave and come back, the app will offer to restore your unsaved draft.
 
 ## 🎬 Use Cases
@@ -41,7 +44,7 @@ This app isn't just for syncing song lyrics. Its high-precision AI transcription
 
 ## 🚀 How to Use
 
-1.  **Upload Media**: Drag and drop or select your video/audio file.
+1.  **Upload Video/Audio**: Drag and drop or select your video/audio file.
 2.  **Provide Lyrics**: You have three options:
     *   **Transcribe (Recommended)**: Click **Transcribe** to let the AI generate lyrics and timings automatically in one step.
     *   **Paste**: Paste the lyrics directly into the text area.
