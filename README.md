@@ -12,6 +12,7 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
 *   **AI-Powered Transcription & Sync**:
     *   **One-Click Transcription**: Don't have the lyrics? Let the AI transcribe the audio for you directly into the editor and generate synchronized subtitles in a single step.
     *   **Automatic Synchronization**: If you already have lyrics, just paste them in and let the AI create a perfectly synchronized subtitle file in seconds.
+*   **One-Click Translation**: Instantly translate your subtitles into multiple languages using the integrated AI translation tool. Perfect for reaching a global audience.
 *   **High-Precision AI Refinement**: Fine-tune generated timings with a single click. The AI analyzes vocal decay and phrasing for professional-grade accuracy.
 *   **Advanced Interactive Editor**:
     *   **One-Click Timestamping**: Click the target icon next to any time field to instantly set it to the video's current playback position.

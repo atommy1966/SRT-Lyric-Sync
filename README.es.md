@@ -12,6 +12,7 @@ Sube un archivo de audio o un video con audio y proporciona la letra completa o 
 *   **Transcripción y Sincronización con IA**:
     *   **Transcripción con Un Clic**: ¿No tienes la letra? Deja que la IA transcriba el audio por ti directamente en el editor y genere subtítulos sincronizados en un solo paso.
     *   **Sincronización Automática**: Si ya tienes la letra, simplemente pégala y deja que la IA cree un archivo de subtítulos perfectamente sincronizado en segundos.
+*   **Traducción con Un Clic**: Traduce instantáneamente tus subtítulos a múltiples idiomas utilizando la herramienta de traducción con IA integrada. Perfecto para alcanzar una audiencia global.
 *   **Refinamiento de Alta Precisión con IA**: Afina los tiempos generados con un solo clic. La IA analiza el decaimiento vocal y el fraseo para una precisión de nivel profesional.
 *   **Editor Interactivo Avanzado**:
     *   **Marcado de Tiempo con Un Clic**: Haz clic en el icono de objetivo junto a cualquier campo de tiempo para establecerlo instantáneamente en la posición de reproducción actual del video.

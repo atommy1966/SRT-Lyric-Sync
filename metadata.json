@@ -1,6 +1,6 @@
 {
   "name": "SRT Lyric Sync",
-  "description": "Upload a audio or a video with audio and provide the SRT,VTT,LRC, or full lyrics to automatically generate a synchronized SRT,VTT,LRC subtitle file using AI.",
+  "description": "Create perfectly synchronized subtitles with AI. SRT Lyric Sync automatically transcribes or syncs lyrics to video/audio. Supports SRT, VTT, and LRC formats. Free online tool.",
   "requestFramePermissions": [
     "clipboard-read"
   ]
