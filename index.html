@@ -121,6 +121,8 @@
           appSubtitle: "AI-powered subtitle synchronization",
           appDescriptionTooltip: "This tool uses AI to synchronize lyrics with an audio or video file, creating subtitle files (SRT, VTT, LRC). You can either provide lyrics or have the AI transcribe them for you.",
           languageSelectorLabel: "Select Language",
+          clearSession: "Clear Session",
+          clearSessionConfirm: "Are you sure you want to clear all data and start over?",
           draftFound: "Found an unsaved draft",
           draftForFile: " for \"{fileName}\"",
           draftQuery: ". Would you like to restore it?",
@@ -220,6 +222,8 @@
           appSubtitle: "AIによる字幕同期ツール",
           appDescriptionTooltip: "このツールはAIを使い、歌詞を音声・動画ファイルと同期させ、字幕ファイル（SRT, VTT, LRC）を作成します。歌詞を直接入力するか、AIに文字起こしさせることも可能です。",
           languageSelectorLabel: "言語を選択",
+          clearSession: "セッションをクリア",
+          clearSessionConfirm: "すべてのデータを消去して最初からやり直しますか？",
           draftFound: "未保存の下書きが見つかりました",
           draftForFile: "（ファイル名: \"{fileName}\"）",
           draftQuery: "。復元しますか？",
@@ -319,6 +323,8 @@
           appSubtitle: "Sincronización de subtítulos con IA",
           appDescriptionTooltip: "Esta herramienta utiliza IA para sincronizar letras con un archivo de audio o video, creando archivos de subtítulos (SRT, VTT, LRC). Puedes proporcionar la letra o dejar que la IA la transcriba por ti.",
           languageSelectorLabel: "Seleccionar Idioma",
+          clearSession: "Limpiar Sesión",
+          clearSessionConfirm: "¿Estás seguro de que quieres borrar todos los datos y empezar de nuevo?",
           draftFound: "Se encontró un borrador no guardado",
           draftForFile: " para \"{fileName}\"",
           draftQuery: ". ¿Te gustaría restaurarlo?",
@@ -418,6 +424,8 @@
           appSubtitle: "AI 驱动的字幕同步工具",
           appDescriptionTooltip: "本工具使用 AI 将歌词与音频或视频文件同步，创建字幕文件（SRT、VTT、LRC）。您可以提供歌词，也可以让 AI 为您转录。",
           languageSelectorLabel: "选择语言",
+          clearSession: "清除会话",
+          clearSessionConfirm: "您确定要清除所有数据并重新开始吗？",
           draftFound: "发现未保存的草稿",
           draftForFile: "（文件名：“{fileName}”）",
           draftQuery: "。您想恢复它吗？",
@@ -1740,7 +1748,7 @@
             const savedDraftJSON = localStorage.getItem('srtLyricSyncDraft');
             if (savedDraftJSON) {
               const savedDraft = JSON.parse(savedDraftJSON);
-              if (savedDraft.entries && Array.isArray(savedDraft.entries) && savedDraft.entries.length > 0) {
+              if (savedDraft.entries && Array.isArray(savedDraft.entries) && savedDraft.entries.length > 0 && savedDraft.fileInfo) {
                 if (typeof savedDraft.offset === 'undefined') savedDraft.offset = 0;
                 if (typeof savedDraft.endTimePadding === 'undefined') savedDraft.endTimePadding = 0;
                 setDraftToRestore(savedDraft);
@@ -1755,10 +1763,15 @@
         useEffect(() => {
           if (isLoading || isRefining) return;
           const handler = setTimeout(() => {
-            if (srtEntries.length > 0) {
-              const draft = { entries: srtEntries, videoFileName: videoFile?.name || null, timestamp: new Date().toISOString(), offset: offset, endTimePadding: endTimePadding };
+            if (srtEntries.length > 0 && videoFile) {
+              const fileInfo = {
+                name: videoFile.name,
+                size: videoFile.size,
+                lastModified: videoFile.lastModified
+              };
+              const draft = { entries: srtEntries, fileInfo, timestamp: new Date().toISOString(), offset: offset, endTimePadding: endTimePadding };
               localStorage.setItem('srtLyricSyncDraft', JSON.stringify(draft));
-            } else {
+            } else if (srtEntries.length === 0) {
               localStorage.removeItem('srtLyricSyncDraft');
             }
           }, 1500);
@@ -1864,9 +1877,12 @@
             setVideoFile(null);
             return;
           }
+           if (draftToRestore && (file.name !== draftToRestore.fileInfo.name || file.size !== draftToRestore.fileInfo.size || file.lastModified !== draftToRestore.fileInfo.lastModified)) {
+                handleDismissDraft();
+           }
           setError(null);
           setVideoFile(file);
-        }, [t]);
+        }, [t, draftToRestore]);
 
         const handleGenerateSrt = useCallback(async (lyricsToGenerate) => {
           if (!videoFile) {
@@ -2045,6 +2061,23 @@
           localStorage.removeItem('srtLyricSyncDraft');
           setDraftToRestore(null);
         };
+        const handleClearSession = () => {
+            if (window.confirm(t('clearSessionConfirm'))) {
+                setVideoFile(null);
+                setLyrics('');
+                resetSrtEntries([]);
+                setOffset(0);
+                setEndTimePadding(0);
+                setError(null);
+                setActiveProcess(null);
+                setImportedFileName(null);
+                setDraftToRestore(null);
+                setIsDownloadMenuOpen(false);
+                setActiveIndex(null);
+                setDetectedFormat(null);
+                localStorage.removeItem('srtLyricSyncDraft');
+            }
+        };
         const handleImportSubtitles = (file) => {
           const reader = new FileReader();
           reader.onload = async (e) => {
@@ -2171,30 +2204,37 @@
         const containerClasses = 'bg-gray-900 text-white font-sans flex flex-col min-h-screen lg:h-screen lg:overflow-hidden';
 
         return CE('div', { className: containerClasses },
-          draftToRestore && CE('div', { className: "bg-gray-800 border-b border-teal-800 text-center p-3 flex justify-center items-center gap-4 text-sm shadow-lg flex-shrink-0" },
+          draftToRestore && videoFile && draftToRestore.fileInfo && (videoFile.name === draftToRestore.fileInfo.name && videoFile.size === draftToRestore.fileInfo.size && videoFile.lastModified === draftToRestore.fileInfo.lastModified) && CE('div', { className: "bg-gray-800 border-b border-teal-800 text-center p-3 flex justify-center items-center gap-4 text-sm shadow-lg flex-shrink-0" },
             CE(ArchiveBoxIcon, { className: "w-6 h-6 text-teal-400 flex-shrink-0" }),
-            CE('p', { className: "text-gray-300" }, t('draftFound'), draftToRestore.videoFileName && CE('span', { className: "font-semibold text-white" }, t('draftForFile', {fileName: draftToRestore.videoFileName})), t('draftQuery')),
+            CE('p', { className: "text-gray-300" }, t('draftFound'), draftToRestore.fileInfo.name && CE('span', { className: "font-semibold text-white" }, t('draftForFile', {fileName: draftToRestore.fileInfo.name})), t('draftQuery')),
             CE('button', { onClick: handleRestoreDraft, className: "px-4 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-md font-semibold transition-colors" }, t('draftRestore')),
             CE('button', { onClick: handleDismissDraft, className: "px-4 py-1.5 hover:bg-gray-700 rounded-md text-gray-400 hover:text-white transition-colors" }, t('draftDismiss'))
           ),
           CE('main', { className: "max-w-7xl mx-auto w-full flex flex-col flex-grow p-4 min-h-0" },
-            CE('header', { className: "text-center my-6 flex-shrink-0" },
-              CE('div', { className: "flex items-center justify-center gap-1" },
-                  CE('h1', { className: "text-lg md:text-xl font-semibold tracking-tight text-gray-300 flex flex-wrap justify-center items-center gap-x-2 px-2" },
-                    CE('span', { className: "font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500" }, t('appTitle')),
-                    CE('span', { className: "text-xs md:text-sm text-gray-400 font-normal" }, t('appSubtitle'))
-                  ),
-                  CE(InfoIconWithTooltip, { text: t('appDescriptionTooltip') }),
-                  CE('select', { 
-                      value: language, 
-                      onChange: e => setLanguage(e.target.value),
-                      className: "ml-4 bg-gray-800 border border-gray-600 text-white text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 p-2",
-                      "aria-label": t('languageSelectorLabel')
-                    },
-                    supportedLanguages.map(lang => 
-                      CE('option', { key: lang.code, value: lang.code }, lang.name)
-                    )
+            CE('header', { className: "flex items-center justify-between my-6 flex-shrink-0" },
+              CE('div', { className: "flex items-center gap-1" },
+                CE('h1', { className: "text-lg md:text-xl font-semibold tracking-tight text-gray-300 flex flex-wrap justify-center items-center gap-x-2 px-2" },
+                  CE('span', { className: "font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500" }, t('appTitle')),
+                  CE('span', { className: "text-xs md:text-sm text-gray-400 font-normal" }, t('appSubtitle'))
+                ),
+                CE(InfoIconWithTooltip, { text: t('appDescriptionTooltip') })
+              ),
+              CE('div', { className: 'flex items-center gap-4' },
+                CE('select', { 
+                    value: language, 
+                    onChange: e => setLanguage(e.target.value),
+                    className: "bg-gray-800 border border-gray-600 text-white text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 p-2",
+                    "aria-label": t('languageSelectorLabel')
+                  },
+                  supportedLanguages.map(lang => 
+                    CE('option', { key: lang.code, value: lang.code }, lang.name)
                   )
+                ),
+                CE('button', {
+                  onClick: handleClearSession,
+                  className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-red-800/80 hover:bg-red-700 text-gray-200",
+                  title: t('clearSession')
+                }, CE(TrashIcon, { className: "w-5 h-5" }), CE('span', { className: 'hidden md:inline' }, t('clearSession')))
               )
             ),
             CE('div', { className: "grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch flex-grow min-h-0" },
