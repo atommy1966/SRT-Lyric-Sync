@@ -2315,7 +2315,7 @@
                        CE('h2', { className: "text-lg font-semibold text-gray-200" }, t('lyricsHeader')),
                        CE(InfoIconWithTooltip, { text: t('lyricsTooltip') })
                     ),
-                    CE('div', { className: "flex items-center gap-2" },
+                    CE('div', { className: "flex items-center flex-wrap justify-end gap-2" },
                       !isSafari && CE('button', {
                         onClick: handlePaste,
                         disabled: allControlsDisabled,
