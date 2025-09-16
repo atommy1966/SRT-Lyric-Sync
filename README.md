@@ -4,8 +4,8 @@
 
 Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full text to automatically generate a synchronized SRT, VTT, or LRC subtitle file using AI.
 
-![SRT Subtitle Sync - Main Interface](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.32.26.png)
-![SRT Subtitle Sync - Editor View](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.33.37.png)
+![SRT Subtitle Sync - Main Interface](https://github.com/atommy1966/SRT-Subtitle-Sync-assets/blob/main/2025-09-16%2021.25.20.png)
+![SRT Subtitle Sync - Editor View](https://github.com/atommy1966/SRT-Subtitle-Sync-assets/blob/main/2025-09-16%2021.33.08.png)
 
 ## ✨ Features
 

@@ -2260,6 +2260,8 @@
         const isAudio = videoFile?.type.startsWith('audio/');
         const uploadBoxTitle = videoFile ? (isAudio ? t('previewHeaderAudio') : t('previewHeaderVideo')) : t('uploadHeader');
         const containerClasses = 'bg-gray-900 text-white font-sans flex flex-col min-h-screen';
+        
+        const toolbarButtonClass = `flex items-center justify-center gap-2 px-3 py-2 ${language === 'ja' ? 'text-xs' : 'text-sm'} font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed`;
 
         return CE('div', { className: containerClasses },
           draftToRestore && videoFile && draftToRestore.fileInfo && (videoFile.name === draftToRestore.fileInfo.name && videoFile.size === draftToRestore.fileInfo.size && videoFile.lastModified === draftToRestore.fileInfo.lastModified) && CE('div', { className: "bg-gray-800 border-b border-teal-800 text-center p-3 flex justify-center items-center gap-4 text-sm shadow-lg flex-shrink-0" },
@@ -2317,17 +2319,22 @@
                       !isSafari && CE('button', {
                         onClick: handlePaste,
                         disabled: allControlsDisabled,
-                        className: "flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed",
+                        className: toolbarButtonClass,
                         title: t('pasteFromClipboard')
                       }, CE(ClipboardPasteIcon, { className: "w-5 h-5" }), t('pasteFromClipboard')),
                       CE('button', {
                         onClick: handleImportClick,
                         disabled: allControlsDisabled,
-                        className: "flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed",
+                        className: toolbarButtonClass,
                         title: t('importTooltip')
                       }, isImporting ? CE('div', { className: "w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin" }) : CE(UploadIcon, { className: "w-5 h-5" }), isImporting ? t('importActive') : t('import')),
                       CE('input', { type: "file", ref: subtitleInputRef, onChange: handleSubtitleFileChange, accept: ".srt,.vtt,.lrc,.txt", className: "hidden", disabled: allControlsDisabled }),
-                      CE('button', { onClick: handleTranscribe, disabled: !canTranscribe, className: "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg shadow-md transition-colors duration-200 bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed", title: canTranscribe ? t('transcribeTooltip') : t('transcribeDisabledTooltip') }, CE(MicrophoneIcon, { className: "w-5 h-5" }), activeProcess === 'transcribe' ? t('transcribeActive') : t('transcribe')),
+                      CE('button', { 
+                        onClick: handleTranscribe, 
+                        disabled: !canTranscribe, 
+                        className: toolbarButtonClass, 
+                        title: canTranscribe ? t('transcribeTooltip') : t('transcribeDisabledTooltip') 
+                      }, CE(MicrophoneIcon, { className: "w-5 h-5" }), activeProcess === 'transcribe' ? t('transcribeActive') : t('transcribe')),
                       CE('button', { onClick: handleGenerate, disabled: !canGenerate, className: "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 ease-in-out bg-teal-600 hover:bg-teal-500 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-teal-500/50 transform hover:scale-105 disabled:transform-none", title: canGenerate ? t('generateTooltip') : t('generateDisabledTooltip') }, CE(SparklesIcon, { className: "w-5 h-5" }), activeProcess === 'generate' ? t('generateActive') : t('generate'))
                     )
                   ),

@@ -4,8 +4,8 @@
 
 上传带有音频的视频或音频文件，并提供 SRT、VTT、LRC 格式的字幕文件或完整的文本内容，即可使用 AI 自动生成同步的 SRT、VTT 或 LRC 字幕文件。
 
-![SRT Subtitle Sync - 主界面](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.32.26.png)
-![SRT Subtitle Sync - 编辑器视图](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.33.37.png)
+![SRT Subtitle Sync - Main Interface](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.32.26.png)
+![SRT Subtitle Sync - Editor View](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.33.37.png)
 
 ## ✨ 主要功能
 
