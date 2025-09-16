@@ -2241,7 +2241,7 @@
         const canTranscribe = videoFile !== null && !allControlsDisabled;
         const isAudio = videoFile?.type.startsWith('audio/');
         const uploadBoxTitle = videoFile ? (isAudio ? t('previewHeaderAudio') : t('previewHeaderVideo')) : t('uploadHeader');
-        const containerClasses = 'bg-gray-900 text-white font-sans flex flex-col min-h-screen lg:h-screen lg:overflow-hidden';
+        const containerClasses = 'bg-gray-900 text-white font-sans flex flex-col min-h-screen';
 
         return CE('div', { className: containerClasses },
           draftToRestore && videoFile && draftToRestore.fileInfo && (videoFile.name === draftToRestore.fileInfo.name && videoFile.size === draftToRestore.fileInfo.size && videoFile.lastModified === draftToRestore.fileInfo.lastModified) && CE('div', { className: "bg-gray-800 border-b border-teal-800 text-center p-3 flex justify-center items-center gap-4 text-sm shadow-lg flex-shrink-0" },
