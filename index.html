@@ -2070,9 +2070,12 @@
         };
         const handleEntryClick = (entry) => {
           if (videoRef.current) {
+            const wasPaused = videoRef.current.paused;
             const seekTime = timestampToMs(entry.startTime) / 1000;
             videoRef.current.currentTime = seekTime;
-            videoRef.current.play();
+            if (!wasPaused) {
+              videoRef.current.play();
+            }
           }
           setActiveIndex(entry.index);
         };
