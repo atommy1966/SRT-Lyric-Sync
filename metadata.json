@@ -1,7 +1,5 @@
 {
-  "name": "SRT Lyric Sync",
-  "description": "Create perfectly synchronized subtitles with AI. SRT Lyric Sync automatically transcribes or syncs lyrics to video/audio. Supports SRT, VTT, and LRC formats. Free online tool.",
-  "requestFramePermissions": [
-    "clipboard-read"
-  ]
+  "name": "SRT Subtitle Sync",
+  "description": "Create perfectly synchronized subtitles with AI. SRT Subtitle Sync automatically transcribes or syncs text to video/audio. Supports SRT, VTT, and LRC formats. Free online tool.",
+  "requestFramePermissions": []
 }

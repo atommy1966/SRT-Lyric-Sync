@@ -1,17 +1,17 @@
-# SRT Lyric Sync
+# SRT Subtitle Sync
 
 [Español](./README.es.md) | [日本語](./README.ja.md) | [简体中文](./README.zh-CN.md)
 
-Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyrics to automatically generate a synchronized SRT, VTT, or LRC subtitle file using AI.
+Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full text to automatically generate a synchronized SRT, VTT, or LRC subtitle file using AI.
 
-![SRT Lyric Sync - Main Interface](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.32.26.png)
-![SRT Lyric Sync - Editor View](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.33.37.png)
+![SRT Subtitle Sync - Main Interface](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.32.26.png)
+![SRT Subtitle Sync - Editor View](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.33.37.png)
 
 ## ✨ Features
 
 *   **AI-Powered Transcription & Sync**:
-    *   **One-Click Transcription**: Don't have the lyrics? Let the AI transcribe the audio for you directly into the editor and generate synchronized subtitles in a single step.
-    *   **Automatic Synchronization**: If you already have lyrics, just paste them in and let the AI create a perfectly synchronized subtitle file in seconds.
+    *   **One-Click Transcription**: Don't have the text? Let the AI transcribe the audio for you directly into the editor and generate synchronized subtitles in a single step.
+    *   **Automatic Synchronization**: If you already have the text, just paste it in and let the AI create a perfectly synchronized subtitle file in seconds.
 *   **Multilingual Interface**: Enjoy a fully localized experience with support for English, Japanese, Spanish, and Chinese.
 *   **One-Click Translation**: Instantly translate your subtitles into multiple languages using the integrated AI translation tool. Perfect for reaching a global audience.
 *   **High-Precision AI Refinement**: Fine-tune generated timings with a single click. The AI analyzes vocal decay and phrasing for professional-grade accuracy.
@@ -29,14 +29,14 @@ Upload an audio or a video with audio and provide the SRT, VTT, LRC, or full lyr
     *   **Real-time Video Preview**: See your edits reflected instantly on the custom video player. The subtitle list automatically scrolls to the currently playing line.
     *   **Multi-Format Support**: Import from `.txt`, `.srt`, `.vtt`, and `.lrc` files. Export your work to SRT, VTT, or LRC with the streamlined download menu.
     *   **Smart Filename Generation**: The app automatically detects the language of your subtitles and includes the language code (e.g., `_ja.srt`) in the downloaded filename for easy organization.
-    *   **Paste-to-Parse**: Paste raw SRT, VTT, or LRC content directly into the lyrics area, and the app will automatically detect the format and offer to load it into the editor with one click.
+    *   **Paste-to-Parse**: Paste raw SRT, VTT, or LRC content directly into the text area, and the app will automatically detect the format and offer to load it into the editor with one click.
     *   **Draft Autosave & Restore**: Your progress is automatically saved in your browser. If you leave and come back, the app will offer to restore your unsaved draft.
 
 ## 🎬 Use Cases
 
 This app isn't just for syncing song lyrics. Its high-precision AI transcription and editing features can streamline your workflow in various scenarios:
 
-*   **Music Videos & Live Performances**: Create perfectly synced lyric subtitles for fans to enjoy.
+*   **Music Videos & Live Performances**: Create perfectly synced subtitles for fans to enjoy.
 *   **Tutorials & Explainer Videos**: Add clear captions to instructional videos to improve viewer comprehension.
 *   **Interviews & Podcasts**: Quickly transcribe recorded interviews to significantly speed up article writing and content editing.
 *   **Lectures & Seminars**: Convert online lectures or seminars into text for meeting minutes or study materials.
@@ -45,12 +45,12 @@ This app isn't just for syncing song lyrics. Its high-precision AI transcription
 ## 🚀 How to Use
 
 1.  **Upload Video/Audio**: Drag and drop or select your video/audio file.
-2.  **Provide Lyrics**: You have three options:
-    *   **Transcribe (Recommended)**: Click **Transcribe** to let the AI generate lyrics and timings automatically in one step.
-    *   **Paste**: Paste the lyrics directly into the text area.
-    *   **Import**: Click **Import** to load lyrics from a `.txt` file or an existing subtitle file (`.srt`, `.vtt`, `.lrc`).
+2.  **Provide Text**: You have three options:
+    *   **Transcribe (Recommended)**: Click **Transcribe** to let the AI generate text and timings automatically in one step.
+    *   **Paste**: Paste the text directly into the text area.
+    *   **Import**: Click **Import** to load text from a `.txt` file or an existing subtitle file (`.srt`, `.vtt`, `.lrc`).
 3.  **Generate/Refine**:
-    *   If you pasted or imported lyrics, click **Generate** to create the initial timings.
+    *   If you pasted or imported text, click **Generate** to create the initial timings.
     *   Click **Refine** at any time to use the AI to improve the timing accuracy of your current subtitles.
 4.  **Edit**: Use the powerful interactive editor to make any final adjustments.
 5.  **Download**: Export your synchronized subtitles in your desired format (SRT, VTT, or LRC).
@@ -59,7 +59,7 @@ This app isn't just for syncing song lyrics. Its high-precision AI transcription
 
 ## 🌐 Live Demo
 
-[Try SRT Lyric Sync Here](https://srt-lyric-sync-369376059789.us-west1.run.app/)
+[Try SRT Subtitle Sync Here](https://srt-lyric-sync-369376059789.us-west1.run.app/)
 
 **Note:** The maximum upload size for media files is 15MB.
 

@@ -1,17 +1,17 @@
-# SRT Lyric Sync
+# SRT Subtitle Sync
 
 [English](./README.md) | [日本語](./README.ja.md) | [简体中文](./README.zh-CN.md)
 
-Sube un archivo de audio o un video con audio y proporciona la letra completa o un archivo SRT, VTT o LRC para generar automáticamente un archivo de subtítulos SRT, VTT o LRC sincronizado usando IA.
+Sube un archivo de audio o un video con audio y proporciona el texto completo o un archivo SRT, VTT o LRC para generar automáticamente un archivo de subtítulos SRT, VTT o LRC sincronizado usando IA.
 
-![SRT Lyric Sync - Interfaz Principal](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.32.26.png)
-![SRT Lyric Sync - Vista del Editor](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.33.37.png)
+![SRT Subtitle Sync - Interfaz Principal](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.32.26.png)
+![SRT Subtitle Sync - Vista del Editor](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.33.37.png)
 
 ## ✨ Características
 
 *   **Transcripción y Sincronización con IA**:
-    *   **Transcripción con Un Clic**: ¿No tienes la letra? Deja que la IA transcriba el audio por ti directamente en el editor y genere subtítulos sincronizados en un solo paso.
-    *   **Sincronización Automática**: Si ya tienes la letra, simplemente pégala y deja que la IA cree un archivo de subtítulos perfectamente sincronizado en segundos.
+    *   **Transcripción con Un Clic**: ¿No tienes el texto? Deja que la IA transcriba el audio por ti directamente en el editor y genere subtítulos sincronizados en un solo paso.
+    *   **Sincronización Automática**: Si ya tienes el texto, simplemente pégalo y deja que la IA cree un archivo de subtítulos perfectamente sincronizado en segundos.
 *   **Interfaz Multilingüe**: Disfruta de una experiencia totalmente localizada con soporte para inglés, español, japonés y chino.
 *   **Traducción con Un Clic**: Traduce instantáneamente tus subtítulos a múltiples idiomas utilizando la herramienta de traducción con IA integrada. Perfecto para alcanzar una audiencia global.
 *   **Refinamiento de Alta Precisión con IA**: Afina los tiempos generados con un solo clic. La IA analiza el decaimiento vocal y el fraseo para una precisión de nivel profesional.
@@ -29,14 +29,14 @@ Sube un archivo de audio o un video con audio y proporciona la letra completa o 
     *   **Vista Previa de Video en Tiempo Real**: Ve tus ediciones reflejadas al instante en el reproductor de video personalizado. La lista de subtítulos se desplaza automáticamente a la línea que se está reproduciendo.
     *   **Soporte Multiformato**: Importa desde archivos `.txt`, `.srt`, `.vtt` y `.lrc`. Exporta tu trabajo a SRT, VTT o LRC con el menú de descarga simplificado.
     *   **Generación Inteligente de Nombres de Archivo**: La aplicación detecta automáticamente el idioma de tus subtítulos e incluye el código de idioma (p. ej., `_es.srt`) en el nombre del archivo descargado para una fácil organización.
-    *   **Pegar para Analizar**: Pega contenido en formato SRT, VTT o LRC directamente en el área de la letra, y la aplicación detectará automáticamente el formato y te ofrecerá cargarlo en el editor con un solo clic.
+    *   **Pegar para Analizar**: Pega contenido en formato SRT, VTT o LRC directamente en el área de texto, y la aplicación detectará automáticamente el formato y te ofrecerá cargarlo en el editor con un solo clic.
     *   **Autoguardado y Restauración de Borradores**: Tu progreso se guarda automáticamente en tu navegador. Si te vas y vuelves, la aplicación te ofrecerá restaurar tu borrador no guardado.
 
 ## 🎬 Casos de Uso
 
 Esta aplicación no es solo para sincronizar letras de canciones. Sus funciones de transcripción y edición de alta precisión con IA pueden optimizar tu flujo de trabajo en diversos escenarios:
 
-*   **Videos Musicales y Actuaciones en Vivo**: Crea subtítulos de letras perfectamente sincronizados para que los fans los disfruten.
+*   **Videos Musicales y Actuaciones en Vivo**: Crea subtítulos perfectamente sincronizados para que los fans los disfruten.
 *   **Tutoriales y Videos Explicativos**: Añade subtítulos claros a videos instructivos para mejorar la comprensión del espectador.
 *   **Entrevistas y Podcasts**: Transcribe rápidamente entrevistas grabadas para acelerar significativamente la redacción de artículos y la edición de contenido.
 *   **Clases y Seminarios**: Convierte clases o seminarios en línea a texto para actas de reuniones o materiales de estudio.
@@ -45,12 +45,12 @@ Esta aplicación no es solo para sincronizar letras de canciones. Sus funciones 
 ## 🚀 Cómo Usar
 
 1.  **Subir Video/Audio**: Arrastra y suelta o selecciona tu archivo de video/audio.
-2.  **Proporcionar la Letra**: Tienes tres opciones:
-    *   **Transcribir (Recomendado)**: Haz clic en **Transcribir** para que la IA genere la letra y los tiempos automáticamente en un solo paso.
-    *   **Pegar**: Pega la letra directamente en el área de texto.
-    *   **Importar**: Haz clic en **Importar** para cargar la letra desde un archivo `.txt` o un archivo de subtítulos existente (`.srt`, `.vtt`, `.lrc`).
+2.  **Proporcionar el Texto**: Tienes tres opciones:
+    *   **Transcribir (Recomendado)**: Haz clic en **Transcribir** para que la IA genere el texto y los tiempos automáticamente en un solo paso.
+    *   **Pegar**: Pega el texto directamente en el área de texto.
+    *   **Importar**: Haz clic en **Importar** para cargar el texto desde un archivo `.txt` o un archivo de subtítulos existente (`.srt`, `.vtt`, `.lrc`).
 3.  **Generar/Refinar**:
-    *   Si pegaste o importaste la letra, haz clic en **Generar** para crear los tiempos iniciales.
+    *   Si pegaste o importaste el texto, haz clic en **Generar** para crear los tiempos iniciales.
     *   Haz clic en **Refinar** en cualquier momento para usar la IA para mejorar la precisión de los tiempos de tus subtítulos actuales.
 4.  **Editar**: Usa el potente editor interactivo para hacer los ajustes finales.
 5.  **Descargar**: Exporta tus subtítulos sincronizados en el formato que desees (SRT, VTT o LRC).
@@ -59,7 +59,7 @@ Esta aplicación no es solo para sincronizar letras de canciones. Sus funciones 
 
 ## 🌐 Demo en Vivo
 
-[Prueba SRT Lyric Sync Aquí](https://srt-lyric-sync-369376059789.us-west1.run.app/)
+[Prueba SRT Subtitle Sync Aquí](https://srt-lyric-sync-369376059789.us-west1.run.app/)
 
 **Nota:** El tamaño máximo de subida para archivos multimedia es de 15MB.
 
