@@ -2363,9 +2363,9 @@
                 CE('div', { className: "bg-gray-900/70 rounded-lg relative flex flex-col flex-grow min-h-0" },
                   isLoading && CE(Loader, { message: loadingMessage, t }),
                   !isLoading && error && CE('div', { className: "flex items-center justify-center h-full text-center text-red-400 p-4" }, CE('p', null, error)),
-                  !isLoading && !error && srtEntries.length > 0 && videoFile && videoUrl ? CE('div', { className: "flex flex-col flex-grow min-h-0" },
-                    CE('div', { className: "relative bg-black flex-shrink-0 border-b-2 border-gray-700/50 max-h-[35vh] p-2" }, CE(VideoPreview, { ref: videoRef, videoFile, videoUrl, entries: srtEntries, onTimeUpdate: setCurrentTime, t })),
-                    CE('div', { className: `p-3 bg-gray-900/50 border-b border-gray-700 transition-all flex-shrink-0 ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}` },
+                  !isLoading && !error && srtEntries.length > 0 && videoFile && videoUrl ? CE('div', { className: "grid grid-rows-[auto_auto_1fr] flex-grow min-h-0" },
+                    CE('div', { className: "relative bg-black border-b-2 border-gray-700/50 max-h-[35vh] p-2" }, CE(VideoPreview, { ref: videoRef, videoFile, videoUrl, entries: srtEntries, onTimeUpdate: setCurrentTime, t })),
+                    CE('div', { className: `p-3 bg-gray-900/50 border-b border-gray-700 transition-all ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}` },
                       CE('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4" },
                         CE('div', { className: "flex-1 min-w-[280px]" },
                           CE('label', { htmlFor: "timing-offset-slider", className: "block text-sm font-medium text-gray-300 mb-2", title: t('globalOffsetTooltip') }, t('globalOffset')),
@@ -2385,7 +2385,7 @@
                         )
                       )
                     ),
-                    CE('div', { className: "flex-grow min-h-0 relative" }, CE(SrtDisplay, { entries: srtEntries, setEntries: setSrtEntries, isRefining, onSetTimeToCurrent: handleSetTimeToCurrent, currentTime, onEntryClick: handleEntryClick, activeIndex, setActiveIndex, t }))
+                    CE('div', { className: "min-h-0 relative" }, CE(SrtDisplay, { entries: srtEntries, setEntries: setSrtEntries, isRefining, onSetTimeToCurrent: handleSetTimeToCurrent, currentTime, onEntryClick: handleEntryClick, activeIndex, setActiveIndex, t }))
                   ) : (!isLoading && !error && srtEntries.length === 0 && CE('div', { className: "flex items-center justify-center h-full text-center text-gray-400 p-4" }, CE('p', null, t('placeholder')))),
                   !isLoading && !error && srtEntries.length > 0 && !videoFile && CE('div', { className: "flex flex-col items-center justify-center h-full text-center text-red-400 p-4" }, CE('p', { className: "font-semibold text-lg" }, t('mediaMissing')), CE('p', { className: "mt-2 text-gray-300" }, t('mediaMissingDescription')))
                 )
