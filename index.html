@@ -1113,6 +1113,7 @@
       const LyricsInput = ({ lyrics, setLyrics, disabled, t }) => {
         const [copied, setCopied] = useState(false);
         const textareaRef = useRef(null);
+        const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         const handleCopy = () => {
           if (lyrics) {
               navigator.clipboard.writeText(lyrics).then(() => {
@@ -1141,7 +1142,7 @@
           CE('div', { className: "relative flex-grow" },
             CE('textarea', { ref: textareaRef, id: "lyrics", "aria-label": "Paste Lyrics", value: lyrics, onChange: (e) => setLyrics(e.target.value), disabled, placeholder: t('lyricsPlaceholder'), className: "w-full h-full p-4 pr-16 bg-gray-800 border border-gray-600 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" }),
             CE('div', { className: "absolute top-2.5 right-2.5 flex items-center gap-1" },
-              lyrics.length === 0 && !disabled && CE('button', { onClick: handlePaste, className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": t('pasteFromClipboard'), title: t('pasteFromClipboard') }, CE(ClipboardPasteIcon, { className: "w-5 h-5" })),
+              lyrics.length === 0 && !disabled && !isSafari && CE('button', { onClick: handlePaste, className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": t('pasteFromClipboard'), title: t('pasteFromClipboard') }, CE(ClipboardPasteIcon, { className: "w-5 h-5" })),
               lyrics.length > 0 && !disabled && CE(React.Fragment, null,
                 CE('button', { onClick: handleCopy, className: "p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors", "aria-label": copied ? t('copied') : t('copyLyrics'), title: copied ? t('copied') : t('copyLyrics') },
                   copied ? CE(CheckIcon, { className: "w-5 h-5 text-teal-400" }) : CE(CopyIcon, { className: "w-5 h-5" })
@@ -2075,6 +2076,8 @@
             videoRef.current.currentTime = seekTime;
             if (!wasPaused) {
               videoRef.current.play();
+            } else {
+              videoRef.current.pause();
             }
           }
           setActiveIndex(entry.index);
