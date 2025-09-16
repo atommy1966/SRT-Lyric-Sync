@@ -1630,7 +1630,7 @@
 
         const allControlsDisabled = isRefining;
 
-        return CE('div', { className: "flex flex-col relative flex-grow min-h-0", onClick: contextMenu ? closeContextMenu : undefined },
+        return CE('div', { className: "absolute inset-0 flex flex-col", onClick: contextMenu ? closeContextMenu : undefined },
           isRefining && CE('div', { className: "absolute inset-0 z-30 rounded-lg" }, CE(Loader, { message: t('loadingRefining'), t })),
           contextMenu && CE(ContextMenu, { x: contextMenu.x, y: contextMenu.y, entry: contextMenu.entry, isFirst: contextMenu.isFirst, isLast: contextMenu.isLast, onClose: closeContextMenu, onDelete: handleDelete, onInsert: handleInsert, onMerge: handleMerge, onMove: handleMove, t }),
           CE('div', { ref: scrollContainerRef, className: `p-2 transition-all flex-grow min-h-0 overflow-y-auto ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}`, onClick: () => setActiveIndex(null) },
@@ -2385,7 +2385,7 @@
                         )
                       )
                     ),
-                    CE('div', { className: "flex-grow min-h-0 flex flex-col" }, CE(SrtDisplay, { entries: srtEntries, setEntries: setSrtEntries, isRefining, onSetTimeToCurrent: handleSetTimeToCurrent, currentTime, onEntryClick: handleEntryClick, activeIndex, setActiveIndex, t }))
+                    CE('div', { className: "flex-grow min-h-0 relative" }, CE(SrtDisplay, { entries: srtEntries, setEntries: setSrtEntries, isRefining, onSetTimeToCurrent: handleSetTimeToCurrent, currentTime, onEntryClick: handleEntryClick, activeIndex, setActiveIndex, t }))
                   ) : (!isLoading && !error && srtEntries.length === 0 && CE('div', { className: "flex items-center justify-center h-full text-center text-gray-400 p-4" }, CE('p', null, t('placeholder')))),
                   !isLoading && !error && srtEntries.length > 0 && !videoFile && CE('div', { className: "flex flex-col items-center justify-center h-full text-center text-red-400 p-4" }, CE('p', { className: "font-semibold text-lg" }, t('mediaMissing')), CE('p', { className: "mt-2 text-gray-300" }, t('mediaMissingDescription')))
                 )
