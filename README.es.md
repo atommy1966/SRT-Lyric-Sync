@@ -4,8 +4,8 @@
 
 Sube un archivo de audio o un video con audio y proporciona el texto completo o un archivo SRT, VTT o LRC para generar automáticamente un archivo de subtítulos SRT, VTT o LRC sincronizado usando IA.
 
-![SRT Subtitle Sync - Main Interface](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.32.26.png)
-![SRT Subtitle Sync - Editor View](https://raw.githubusercontent.com/atommy1966/SRT-Lyric-Sync-assets/main/2025-09-14%209.33.37.png)
+![SRT Subtitle Sync - Main Interface](https://github.com/atommy1966/SRT-Subtitle-Sync-assets/blob/main/2025-09-16%2021.25.20.png)
+![SRT Subtitle Sync - Editor View](https://github.com/atommy1966/SRT-Subtitle-Sync-assets/blob/main/2025-09-16%2021.33.08.png)
 
 ## ✨ Características
 
