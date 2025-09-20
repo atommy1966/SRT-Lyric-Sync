@@ -67,18 +67,25 @@
 
 本应用设计为从环境变量（`process.env.API_KEY`）获取 Gemini API 密钥，这在部署到 Google AI Studio 时会自动处理。
 
-**仅限本地开发时**，您需要手动提供密钥。
+**仅限本地开发时**，您需要创建一个特殊文件来提供您的密钥。
 
-### 1. 设置您的 API 密钥（本地解决方案）
-由于这是一个没有构建过程的简单静态项目，您必须临时编辑 `services/geminiService.ts` 文件以插入您的密钥。
+### 1. 创建 `local_env.js` 文件
+在项目的根目录中，创建一个新文件并命名为 `local_env.js`。
 
-- **打开文件：** `services/geminiService.ts`
-- **找到这一行：** `const API_KEY = process.env.API_KEY;`
-- **替换为您的密钥：** `const API_KEY = "在此处填入您的GEMINI_API密钥";`
+### 2. 设置您的 API 密钥
+将以下内容添加到 `local_env.js` 文件中，并将 `"YOUR_GEMINI_API_KEY_HERE"` 替换为您的真实 Gemini API 密钥：
+```javascript
+// 仅供本地开发使用
+window.process = {
+  env: {
+    API_KEY: "YOUR_GEMINI_API_KEY_HERE"
+  }
+};
+```
 
-⚠️ **重要提示：** 这仅用于本地测试。**请勿提交此更改**或将其推送到公共仓库，因为这会暴露您的 API 密钥。
+⚠️ **重要提示：** 这仅用于本地测试。**请勿提交此文件**或将其推送到公共仓库，因为这会暴露您的 API 密钥。
 
-### 2. 运行本地服务器
+### 3. 运行本地服务器
 本项目不需要复杂的构建过程。
 - 在项目的根目录中打开一个终端。
 - 使用一个简单的本地服务器。例如：
@@ -90,7 +97,7 @@
   npx serve .
   ```
 
-### 3. 在浏览器中打开
+### 4. 在浏览器中打开
 - 访问您终端中显示的本地 URL（例如 `http://localhost:8000`）。
 
 ---

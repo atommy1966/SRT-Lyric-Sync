@@ -67,18 +67,25 @@ This app isn't just for syncing song lyrics. Its high-precision AI transcription
 
 This application is designed to get the Gemini API Key from an environment variable (`process.env.API_KEY`), which is automatically handled when deployed in Google AI Studio.
 
-For **local development only**, you will need to provide the key manually.
+For **local development only**, you need to create a special file to provide your key.
 
-### 1. Set Your API Key (Local Workaround)
-Because this is a simple static project without a build process, you must temporarily edit `services/geminiService.ts` to insert your key.
+### 1. Create `local_env.js` file
+In the project's root directory, create a new file and name it `local_env.js`.
 
-- **Open:** `services/geminiService.ts`
-- **Find the line:** `const API_KEY = process.env.API_KEY;`
-- **Replace it with your key:** `const API_KEY = "YOUR_GEMINI_API_KEY_HERE";`
+### 2. Set Your API Key
+Add the following content to `local_env.js`, replacing `"YOUR_GEMINI_API_KEY_HERE"` with your actual Gemini API key:
+```javascript
+// FOR LOCAL DEVELOPMENT ONLY
+window.process = {
+  env: {
+    API_KEY: "YOUR_GEMINI_API_KEY_HERE"
+  }
+};
+```
 
-⚠️ **CRITICAL:** This is for local testing only. **Do not commit this change** or push it to a public repository, as it will expose your API key.
+⚠️ **CRITICAL:** This is for local testing only. **Do not commit this file** or push it to a public repository, as it will expose your API key.
 
-### 2. Run a Local Server
+### 3. Run a Local Server
 This project doesn't need a complex build process.
 - Open a terminal in the project's root directory.
 - Use a simple local server. For example:
@@ -90,7 +97,7 @@ This project doesn't need a complex build process.
   npx serve .
   ```
 
-### 3. Open in Browser
+### 4. Open in Browser
 - Navigate to the local URL shown in your terminal (e.g., `http://localhost:8000`).
 
 ---

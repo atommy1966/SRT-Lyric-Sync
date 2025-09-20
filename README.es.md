@@ -67,18 +67,25 @@ Esta aplicación no es solo para sincronizar letras de canciones. Sus funciones 
 
 Esta aplicación está diseñada para obtener la clave de la API de Gemini de una variable de entorno (`process.env.API_KEY`), lo cual se maneja automáticamente cuando se despliega en Google AI Studio.
 
-Para el **desarrollo local únicamente**, necesitarás proporcionar la clave manualmente.
+Para el **desarrollo local únicamente**, necesitas crear un archivo especial para proporcionar tu clave.
 
-### 1. Establece tu Clave de API (Solución Local)
-Dado que este es un proyecto estático simple sin un proceso de compilación, debes editar temporalmente `services/geminiService.ts` para insertar tu clave.
+### 1. Crea el archivo `local_env.js`
+En el directorio raíz del proyecto, crea un nuevo archivo y llámalo `local_env.js`.
 
-- **Abre:** `services/geminiService.ts`
-- **Busca la línea:** `const API_KEY = process.env.API_KEY;`
-- **Reemplázala con tu clave:** `const API_KEY = "TU_CLAVE_DE_API_DE_GEMINI_AQUÍ";`
+### 2. Establece tu Clave de API
+Agrega el siguiente contenido a `local_env.js`, reemplazando `"YOUR_GEMINI_API_KEY_HERE"` con tu clave de API de Gemini real:
+```javascript
+// SOLO PARA DESARROLLO LOCAL
+window.process = {
+  env: {
+    API_KEY: "YOUR_GEMINI_API_KEY_HERE"
+  }
+};
+```
 
 ⚠️ **CRÍTICO:** Esto es solo para pruebas locales. **No confirmes este cambio** ni lo subas a un repositorio público, ya que expondrá tu clave de API.
 
-### 2. Ejecuta un Servidor Local
+### 3. Ejecuta un Servidor Local
 Este proyecto no necesita un proceso de compilación complejo.
 - Abre una terminal en el directorio raíz del proyecto.
 - Usa un servidor local simple. Por ejemplo:
@@ -90,7 +97,7 @@ Este proyecto no necesita un proceso de compilación complejo.
   npx serve .
   ```
 
-### 3. Abre en el Navegador
+### 4. Abre en el Navegador
 - Navega a la URL local que se muestra en tu terminal (p. ej., `http://localhost:8000`).
 
 ---
