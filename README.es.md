@@ -67,7 +67,7 @@ Esta aplicación no es solo para sincronizar letras de canciones. Sus funciones 
 
 Esta aplicación está diseñada para obtener la clave de la API de Gemini de una variable de entorno (`process.env.API_KEY`), lo cual se maneja automáticamente cuando se despliega en Google AI Studio.
 
-Para el **desarrollo local únicamente**, necesitas crear un archivo especial para proporcionar tu clave.
+Para el **desarrollo local únicamente**, necesitas proporcionar tu clave manualmente.
 
 ### 1. Crea el archivo `local_env.js`
 En el directorio raíz del proyecto, crea un nuevo archivo y llámalo `local_env.js`.
@@ -83,9 +83,15 @@ window.process = {
 };
 ```
 
-⚠️ **CRÍTICO:** Esto es solo para pruebas locales. **No confirmes este cambio** ni lo subas a un repositorio público, ya que expondrá tu clave de API.
+### 3. Enlaza el script en `index.html`
+Abre `index.html` y añade la siguiente línea justo antes de la etiqueta `<script type="importmap">`:
+```html
+<script src="local_env.js"></script>
+```
 
-### 3. Ejecuta un Servidor Local
+⚠️ **CRÍTICO:** Esta configuración es solo para pruebas locales. **No confirmes los cambios en `index.html` que incluyen esta etiqueta de script**, y **no confirmes el archivo `local_env.js`**. Subir estos a un repositorio público expondrá tu clave de API.
+
+### 4. Ejecuta un Servidor Local
 Este proyecto no necesita un proceso de compilación complejo.
 - Abre una terminal en el directorio raíz del proyecto.
 - Usa un servidor local simple. Por ejemplo:
@@ -97,7 +103,7 @@ Este proyecto no necesita un proceso de compilación complejo.
   npx serve .
   ```
 
-### 4. Abre en el Navegador
+### 5. Abre en el Navegador
 - Navega a la URL local que se muestra en tu terminal (p. ej., `http://localhost:8000`).
 
 ---

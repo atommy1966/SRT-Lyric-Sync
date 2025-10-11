@@ -49,7 +49,6 @@
 
     <script defer data-domain="srt-lyric-sync-369376059789.us-west1.run.app" src="https://plausible.io/js/script.file-downloads.hash.outbound-links.pageview-props.revenue.tagged-events.js"></script>
     <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
-  <script src="local_env.js"></script>
   <script type="importmap">
 {
   "imports": {
@@ -1199,7 +1198,7 @@
       };
 
       // ** components/VideoPreview.tsx **
-      const VideoPreview = forwardRef(({ videoFile, videoUrl, entries, onTimeUpdate, t }, ref) => {
+      const VideoPreview = forwardRef(({ videoFile, videoUrl, entries, onTimeUpdate, onDurationChange, t }, ref) => {
         const localVideoRef = useRef(null);
         const containerRef = useRef(null);
         const trackRef = useRef(null);
@@ -1303,7 +1302,13 @@
           setCurrentTime(time);
           onTimeUpdate(time);
         };
-        const handleLoadedMetadata = (e) => setDuration(e.currentTarget.duration);
+        const handleLoadedMetadata = (e) => {
+            const newDuration = e.currentTarget.duration;
+            setDuration(newDuration);
+            if (onDurationChange) {
+                onDurationChange(newDuration);
+            }
+        };
         const handleVolumeChangeOnVideo = (e) => {
           setVolume(e.currentTarget.volume);
           setIsMuted(e.currentTarget.muted);
@@ -1744,6 +1749,7 @@
       const App = () => {
         const [videoFile, setVideoFile] = useState(null);
         const [videoUrl, setVideoUrl] = useState(null);
+        const [videoDuration, setVideoDuration] = useState(0);
         const [textInput, setTextInput] = useState('');
         const { state: srtEntries, setState: setSrtEntries, resetState: resetSrtEntries, undo, redo, canUndo, canRedo } = useHistoryState([]);
         const [offset, setOffset] = useState(0);
@@ -1774,6 +1780,25 @@
           return text;
         }, [language]);
         
+        const clampEntriesToDuration = useCallback((entries, duration) => {
+            if (!duration || duration <= 0) return entries;
+            const durationMs = duration * 1000;
+            return entries.map(entry => {
+                let startTimeMs = timestampToMs(entry.startTime);
+                let endTimeMs = timestampToMs(entry.endTime);
+
+                if (startTimeMs > durationMs) startTimeMs = durationMs;
+                if (endTimeMs > durationMs) endTimeMs = durationMs;
+                if (startTimeMs > endTimeMs) startTimeMs = endTimeMs;
+                
+                return {
+                    ...entry,
+                    startTime: msToTimestamp(startTimeMs),
+                    endTime: msToTimestamp(endTimeMs),
+                };
+            });
+        }, []);
+
         const handlePaste = useCallback(async () => {
           try {
               const text = await navigator.clipboard.readText();
@@ -1844,6 +1869,7 @@
           if (!videoFile) {
             if (videoUrl) URL.revokeObjectURL(videoUrl);
             setVideoUrl(null);
+            setVideoDuration(0);
             return;
           }
           const objectUrl = URL.createObjectURL(videoFile);
@@ -1916,8 +1942,9 @@
             const initialSrtData = await generateSrtFromVideoAndText(videoBase64, videoFile.type, transcribedText);
             setLoadingMessage(t('loadingTranscribingStep3'));
             const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
-            resetSrtEntries(refinedSrtData);
-            const updatedText = refinedSrtData.map(entry => entry.text).join('\n');
+            const clampedData = clampEntriesToDuration(refinedSrtData, videoDuration);
+            resetSrtEntries(clampedData);
+            const updatedText = clampedData.map(entry => entry.text).join('\n');
             setTextInput(updatedText);
           } catch (e) {
             handleApiError(e);
@@ -1925,7 +1952,7 @@
             setActiveProcess(null);
             setLoadingMessage('');
           }
-        }, [videoFile, resetSrtEntries, setTextInput, t, language, handleApiError]);
+        }, [videoFile, resetSrtEntries, setTextInput, t, language, handleApiError, videoDuration, clampEntriesToDuration]);
 
         const handleFileSelect = useCallback((file) => {
           if (!file) {
@@ -1966,8 +1993,9 @@
             const initialSrtData = await generateSrtFromVideoAndText(videoBase64, videoFile.type, textToGenerate);
             setLoadingMessage(t('loadingGeneratingStep2'));
             const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, initialSrtData);
-            resetSrtEntries(refinedSrtData);
-            const updatedText = refinedSrtData.map(entry => entry.text).join('\n');
+            const clampedData = clampEntriesToDuration(refinedSrtData, videoDuration);
+            resetSrtEntries(clampedData);
+            const updatedText = clampedData.map(entry => entry.text).join('\n');
             setTextInput(updatedText);
           } catch (e) {
             handleApiError(e);
@@ -1975,7 +2003,7 @@
             setActiveProcess(null);
             setLoadingMessage('');
           }
-        }, [videoFile, resetSrtEntries, setTextInput, t, language, handleApiError]);
+        }, [videoFile, resetSrtEntries, setTextInput, t, language, handleApiError, videoDuration, clampEntriesToDuration]);
 
         const handleGenerate = useCallback(() => {
           setImportedFileName(null);
@@ -1996,7 +2024,8 @@
           try {
             const videoBase64 = await fileToBase64(videoFile);
             const refinedSrtData = await refineSrtTimings(videoBase64, videoFile.type, srtEntries);
-            setSrtEntries(refinedSrtData);
+            const clampedData = clampEntriesToDuration(refinedSrtData, videoDuration);
+            setSrtEntries(clampedData);
             setOffset(0);
             setEndTimePadding(0);
           } catch (e) {
@@ -2004,7 +2033,7 @@
           } finally {
             setIsRefining(false);
           }
-        }, [videoFile, srtEntries, setSrtEntries, t, handleApiError]);
+        }, [videoFile, srtEntries, setSrtEntries, t, handleApiError, videoDuration, clampEntriesToDuration]);
 
         const languageNameToCodeMap = {
             'English': 'en', 'Spanish': 'es', 'French': 'fr', 'German': 'de', 
@@ -2035,28 +2064,34 @@
         const handleOffsetChange = (newOffsetValue) => {
           const diff = newOffsetValue - offset;
           if (diff === 0) return;
-          setSrtEntries(currentEntries => currentEntries.map(entry => {
-            const newStartTime = timestampToMs(entry.startTime) + diff;
-            const newEndTime = timestampToMs(entry.endTime) + diff;
-            return { ...entry, startTime: msToTimestamp(newStartTime), endTime: msToTimestamp(newEndTime) };
-          }));
+          setSrtEntries(currentEntries => {
+            const newEntries = currentEntries.map(entry => {
+                const newStartTime = timestampToMs(entry.startTime) + diff;
+                const newEndTime = timestampToMs(entry.endTime) + diff;
+                return { ...entry, startTime: msToTimestamp(newStartTime), endTime: msToTimestamp(newEndTime) };
+            });
+            return clampEntriesToDuration(newEntries, videoDuration);
+          });
           setOffset(newOffsetValue);
         };
         const handleEndTimePaddingChange = (newPadding) => {
           const diff = newPadding - endTimePadding;
           if (diff === 0) return;
-          setSrtEntries(currentEntries => currentEntries.map((entry, index) => {
-            const startTimeMs = timestampToMs(entry.startTime);
-            let newEndTimeMs = timestampToMs(entry.endTime) + diff;
-            newEndTimeMs = Math.max(startTimeMs, newEndTimeMs);
-            const isIncreasingPadding = diff > 0;
-            const hasNextEntry = index < currentEntries.length - 1;
-            if (isIncreasingPadding && hasNextEntry) {
-              const nextEntryStartTimeMs = timestampToMs(currentEntries[index + 1].startTime);
-              newEndTimeMs = Math.min(newEndTimeMs, nextEntryStartTimeMs);
-            }
-            return { ...entry, endTime: msToTimestamp(newEndTimeMs) };
-          }));
+          setSrtEntries(currentEntries => {
+            const newEntries = currentEntries.map((entry, index) => {
+                const startTimeMs = timestampToMs(entry.startTime);
+                let newEndTimeMs = timestampToMs(entry.endTime) + diff;
+                newEndTimeMs = Math.max(startTimeMs, newEndTimeMs);
+                const isIncreasingPadding = diff > 0;
+                const hasNextEntry = index < currentEntries.length - 1;
+                if (isIncreasingPadding && hasNextEntry) {
+                  const nextEntryStartTimeMs = timestampToMs(currentEntries[index + 1].startTime);
+                  newEndTimeMs = Math.min(newEndTimeMs, nextEntryStartTimeMs);
+                }
+                return { ...entry, endTime: msToTimestamp(newEndTimeMs) };
+            });
+            return clampEntriesToDuration(newEntries, videoDuration);
+          });
           setEndTimePadding(newPadding);
         };
         const handleSetTimeToCurrent = (entryIndex, field) => {
@@ -2176,7 +2211,8 @@
                     setContentLanguage(detectedLang || language);
                     setError(null);
                     setTextInput(fullText);
-                    resetSrtEntries(parsedEntries);
+                    const clampedEntries = clampEntriesToDuration(parsedEntries, videoDuration);
+                    resetSrtEntries(clampedEntries);
                     setOffset(0);
                     setEndTimePadding(0);
                     setImportedFileName(file.name);
@@ -2219,7 +2255,8 @@
                 setContentLanguage(detectedLang || language);
                 setError(null);
                 setTextInput(fullText);
-                resetSrtEntries(parsedEntries);
+                const clampedEntries = clampEntriesToDuration(parsedEntries, videoDuration);
+                resetSrtEntries(clampedEntries);
                 setOffset(0);
                 setEndTimePadding(0);
                 setImportedFileName(null);
@@ -2396,7 +2433,7 @@
                   isLoading && CE(Loader, { message: loadingMessage, t }),
                   !isLoading && error && CE('div', { className: "flex items-center justify-center h-full text-center text-red-400 p-4" }, CE('p', null, error)),
                   !isLoading && !error && srtEntries.length > 0 && videoFile && videoUrl ? CE('div', { className: "grid grid-rows-[auto_auto_1fr] flex-grow min-h-0" },
-                    CE('div', { className: "relative bg-black border-b-2 border-gray-700/50 max-h-[25vh] lg:max-h-[35vh] p-2" }, CE(VideoPreview, { ref: videoRef, videoFile, videoUrl, entries: srtEntries, onTimeUpdate: setCurrentTime, t })),
+                    CE('div', { className: "relative bg-black border-b-2 border-gray-700/50 max-h-[25vh] lg:max-h-[35vh] p-2" }, CE(VideoPreview, { ref: videoRef, videoFile, videoUrl, entries: srtEntries, onTimeUpdate: setCurrentTime, onDurationChange: setVideoDuration, t })),
                     CE('div', { className: `p-3 bg-gray-900/50 border-b border-gray-700 transition-all ${allControlsDisabled ? 'filter blur-sm pointer-events-none' : ''}` },
                       CE('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4" },
                         CE('div', { className: "flex-1 min-w-[280px]" },
